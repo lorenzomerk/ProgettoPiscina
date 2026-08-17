@@ -4,14 +4,13 @@
 -- e account tecnici per provare tutte le viste applicative.
 USE piscina_progetto;
 
--- Rimuove esclusivamente il referente club creato dalle versioni precedenti
--- del popolamento, identificato anche tramite hash e salt originari.
+-- Rimuove esclusivamente il receptionist demo delle versioni precedenti,
+-- non previsto tra le viste Utente, Club e Amministratore della relazione.
 DELETE FROM ACCOUNT
-WHERE Email = 'club@piscina.local'
-  AND Ruolo = 'REFERENTE_CLUB'
+WHERE Email = 'reception@piscina.local'
   AND Password_Hash =
-      'YEjRdihexV2bM3i7xEAooSCbJoX0ZtVDMlUE4ZPfM4M='
-  AND Password_Salt = 'JwD8tH93fWUSh0L5zTJjDg==';
+      'HT+VnzvB4Sh5Tq0YM8Ai80maVKR3V9kMsfhfFTGGReA='
+  AND Password_Salt = 'apOYKLo+ZMMaLSae1vl6dw==';
 
 -- ===========================================================================
 -- UTENTI E QUALIFICHE DI DOMINIO
@@ -343,7 +342,7 @@ WHERE u.Email = 'cliente@piscina.local'
 -- ACCOUNT TECNICI DELL'INTERFACCIA
 -- ===========================================================================
 -- Amministratore: admin@piscina.local / Admin123!
--- Receptionist:   reception@piscina.local / Reception123!
+-- Club:            club@piscina.local / Club123!
 -- Cliente:        cliente@piscina.local / Cliente123!
 -- Atleta:         atleta@piscina.local / Atleta123!
 -- Istruttore:     istruttore@piscina.local / Istruttore123!
@@ -356,9 +355,9 @@ VALUES
     (NULL, 'Ada', 'Amministratrice', 'admin@piscina.local',
      'WtIXo7Cuf+dpsbXZk3jy7Mpp7C3M5npIkQ2cDAr7Z4w=',
      'gn61Au/imua65hXgNHGoEA==', 210000, 'AMMINISTRATORE', TRUE),
-    (NULL, 'Rita', 'Reception', 'reception@piscina.local',
-     'HT+VnzvB4Sh5Tq0YM8Ai80maVKR3V9kMsfhfFTGGReA=',
-     'apOYKLo+ZMMaLSae1vl6dw==', 210000, 'RECEPTIONIST', TRUE),
+    (NULL, 'Nuoto', 'Emilia', 'club@piscina.local',
+     'YEjRdihexV2bM3i7xEAooSCbJoX0ZtVDMlUE4ZPfM4M=',
+     'JwD8tH93fWUSh0L5zTJjDg==', 210000, 'CLUB', TRUE),
     ((SELECT ID_Utente FROM UTENTE
       WHERE Email = 'cliente@piscina.local'),
      'Chiara', 'Cliente', 'cliente@piscina.local',

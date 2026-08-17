@@ -45,14 +45,15 @@ seguenti:
 | Prospettiva della relazione | Email | Password |
 |---|---|---|
 | Amministratore | `admin@piscina.local` | `Admin123!` |
+| Club | `club@piscina.local` | `Club123!` |
 | Utente | `cliente@piscina.local` | `Cliente123!` |
 | Utente con qualifica di atleta | `atleta@piscina.local` | `Atleta123!` |
 | Utente con qualifica di istruttore | `istruttore@piscina.local` | `Istruttore123!` |
 | Utente atleta e istruttore | `atleta.istruttore@piscina.local` | `Completo123!` |
 
-La prospettiva **Club** è disponibile accedendo come Amministratore e aprendo
-la sezione **Club e squadre**. Atleta e istruttore sono qualifiche della
-persona collegata e non profili di autenticazione autonomi.
+I profili applicativi Amministratore, Club e Utente corrispondono alle tre
+prospettive operative della relazione. Atleta e istruttore sono qualifiche
+della persona collegata e non profili di autenticazione autonomi.
 
 Queste credenziali applicative sono distinte da quelle dell'utente JDBC usato
 dal programma per collegarsi a MySQL.

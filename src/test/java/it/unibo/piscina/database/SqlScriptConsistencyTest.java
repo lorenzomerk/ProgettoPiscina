@@ -72,6 +72,11 @@ class SqlScriptConsistencyTest {
         assertTrue(schema.contains("TR_ACCESSO_BI"));
         assertTrue(schema.contains("TR_UTILIZZA_BI"));
         assertTrue(schema.contains("TR_APPARTENENZA_BI"));
+        assertTrue(schema.contains(
+            "'AMMINISTRATORE', 'CLUB', 'UTENTE'"
+        ));
+        assertFalse(schema.contains("'RECEPTIONIST'"));
+        assertFalse(schema.contains("'REFERENTE_CLUB'"));
     }
 
     @Test
@@ -108,7 +113,7 @@ class SqlScriptConsistencyTest {
         );
         final List<String> demoAccounts = List.of(
             "admin@piscina.local",
-            "reception@piscina.local",
+            "club@piscina.local",
             "cliente@piscina.local",
             "atleta@piscina.local",
             "istruttore@piscina.local",
@@ -125,24 +130,16 @@ class SqlScriptConsistencyTest {
                 "Account non documentato nel README: " + email
             );
         }
-        assertEquals(
-            1,
-            occurrences(demo, "club@piscina.local"),
-            "Il vecchio account club deve comparire solo nella pulizia"
-        );
         assertTrue(
             demo.contains("DELETE FROM ACCOUNT"),
-            "Il popolamento deve rimuovere il vecchio account club"
+            "Il popolamento deve rimuovere il vecchio account receptionist"
         );
         assertFalse(
-            projectReadme.contains("club@piscina.local"),
-            "Il README non deve documentare il vecchio account club"
+            projectReadme.contains("reception@piscina.local"),
+            "Il README non deve documentare account estranei alla relazione"
         );
-        assertEquals(
-            1,
-            occurrences(demo, "'REFERENTE_CLUB'"),
-            "Il ruolo club deve comparire solo nella pulizia del vecchio seed"
-        );
+        assertTrue(demo.contains("'CLUB'"));
+        assertFalse(demo.contains("'REFERENTE_CLUB'"));
     }
 
     @Test
@@ -193,8 +190,4 @@ class SqlScriptConsistencyTest {
         );
     }
 
-    private int occurrences(final String text, final String fragment) {
-        return (text.length() - text.replace(fragment, "").length())
-            / fragment.length();
-    }
 }

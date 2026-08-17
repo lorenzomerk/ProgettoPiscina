@@ -11,12 +11,8 @@ public enum RuoloApplicativo {
             "Struttura", "Club e squadre", "Riepiloghi"
         )
     ),
-    RECEPTIONIST(
-        "Receptionist / operatore",
-        Set.of("Utenti", "Accessi", "Abbonamenti", "Attività")
-    ),
-    REFERENTE_CLUB(
-        "Referente club",
+    CLUB(
+        "Club",
         Set.of("Attività", "Club e squadre")
     ),
     UTENTE(

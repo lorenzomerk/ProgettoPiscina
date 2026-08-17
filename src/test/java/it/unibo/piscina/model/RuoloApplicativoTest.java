@@ -32,6 +32,18 @@ class RuoloApplicativoTest {
     }
 
     @Test
+    void clubAccedeSoloAlleAreeDellaPropriaVista() {
+        final RuoloApplicativo role = RuoloApplicativo.CLUB;
+
+        assertTrue(role.puoAccedere("Attività"));
+        assertTrue(role.puoAccedere("Club e squadre"));
+        assertFalse(role.puoAccedere("Utenti"));
+        assertFalse(role.puoAccedere("Abbonamenti"));
+        assertFalse(role.puoAccedere("Struttura"));
+        assertFalse(role.puoAccedere("Riepiloghi"));
+    }
+
+    @Test
     void qualificheEstendonoLaVistaUtenteSenzaCambiareProfilo() {
         final SessioneUtente session = new SessioneUtente(
             1L,

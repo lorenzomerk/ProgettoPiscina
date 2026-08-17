@@ -52,16 +52,34 @@ PREPARE drop_account_role_check FROM @drop_account_role_check;
 EXECUTE drop_account_role_check;
 DEALLOCATE PREPARE drop_account_role_check;
 
+-- Elimina soltanto il receptionist creato dal vecchio popolamento demo,
+-- riconosciuto tramite le credenziali tecniche originarie.
+DELETE FROM ACCOUNT
+WHERE Email = 'reception@piscina.local'
+  AND Password_Hash =
+      'HT+VnzvB4Sh5Tq0YM8Ai80maVKR3V9kMsfhfFTGGReA='
+  AND Password_Salt = 'apOYKLo+ZMMaLSae1vl6dw==';
+
 UPDATE ACCOUNT
 SET Ruolo = 'UTENTE'
 WHERE Ruolo IN ('CLIENTE', 'ISTRUTTORE');
+
+UPDATE ACCOUNT
+SET Ruolo = 'CLUB'
+WHERE Ruolo = 'REFERENTE_CLUB';
+
+-- Il profilo receptionist non appartiene alle viste della relazione. Gli
+-- eventuali account preesistenti vengono conservati ma disattivati, evitando
+-- di assegnare automaticamente privilegi appartenenti a un'altra vista.
+UPDATE ACCOUNT
+SET Ruolo = 'UTENTE', Attivo = FALSE
+WHERE Ruolo = 'RECEPTIONIST';
 
 ALTER TABLE ACCOUNT
     MODIFY Ruolo VARCHAR(30) NOT NULL DEFAULT 'UTENTE',
     ADD CONSTRAINT CK_ACCOUNT_RUOLO CHECK (
         Ruolo IN (
-            'AMMINISTRATORE', 'RECEPTIONIST',
-            'REFERENTE_CLUB', 'UTENTE'
+            'AMMINISTRATORE', 'CLUB', 'UTENTE'
         )
     );
 

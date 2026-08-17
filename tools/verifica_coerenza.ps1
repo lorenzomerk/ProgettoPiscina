@@ -2,7 +2,9 @@ $ErrorActionPreference = 'Stop'
 Set-StrictMode -Version Latest
 
 # La relazione finale è la fonte dei requisiti e non viene modificata.
-$relation = 'C:\Users\loren\Downloads\finale.docx'
+$relation = Join-Path (
+    [Environment]::GetFolderPath('UserProfile')
+) 'Downloads\relazione.docx'
 $projectRoot = Split-Path -Parent $PSScriptRoot
 $schema = Join-Path $projectRoot 'doc\sql\01_schema_completo.sql'
 $sourceRoot = Join-Path $projectRoot 'src\main\java'
@@ -44,10 +46,13 @@ $paragraphs = foreach (
         ForEach-Object { $_.InnerText }
     ) -join ''
 }
-$chapterFour = [Array]::IndexOf(
-    $paragraphs,
-    'Capitolo 4 – Progettazione logica'
-)
+$chapterFour = -1
+for ($index = 0; $index -lt $paragraphs.Count; $index++) {
+    if ($paragraphs[$index] -match '^Capitolo 4\b') {
+        $chapterFour = $index
+        break
+    }
+}
 if ($chapterFour -lt 0) {
     throw 'Inizio del capitolo 4 non trovato nella relazione'
 }
@@ -141,9 +146,28 @@ foreach ($section in $sections) {
     }
 }
 
+$applicationRoles = @(
+    'AMMINISTRATORE',
+    'CLUB',
+    'UTENTE'
+)
+foreach ($role in $applicationRoles) {
+    if ($schemaText -notmatch ("'" + $role + "'")) {
+        $errors.Add("Profilo applicativo non trovato nello schema: $role")
+    }
+    if ($sourceText -notmatch ('\b' + $role + '\b')) {
+        $errors.Add("Profilo applicativo non trovato nei sorgenti: $role")
+    }
+}
+if ($schemaText -match "'RECEPTIONIST'|'REFERENTE_CLUB'") {
+    $errors.Add(
+        'Lo schema contiene profili estranei alle viste della relazione'
+    )
+}
+
 if ($errors.Count -gt 0) {
     $errors | ForEach-Object { Write-Error $_ }
     exit 1
 }
 
-Write-Output "Coerenza strutturale verificata: $($entities.Count) entità, $($associations.Count) associazioni, $($requiredTriggers.Count) gruppi di vincoli e $($sections.Count) sezioni applicative."
+Write-Output "Coerenza strutturale verificata: $($entities.Count) entità, $($associations.Count) associazioni, $($requiredTriggers.Count) gruppi di vincoli, $($sections.Count) sezioni e $($applicationRoles.Count) profili applicativi."

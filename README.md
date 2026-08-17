@@ -152,14 +152,16 @@ Per provare l'applicazione con email e password è necessario avere eseguito
 | Prospettiva della relazione | Email | Password | Contenuti disponibili |
 |---|---|---|---|
 | Amministratore | `admin@piscina.local` | `Admin123!` | Tutte le sezioni, compresa la gestione di club e squadre |
+| Club | `club@piscina.local` | `Club123!` | Attività, club e squadre |
 | Utente | `cliente@piscina.local` | `Cliente123!` | Accessi, abbonamenti e attività |
 | Utente con qualifica di atleta | `atleta@piscina.local` | `Atleta123!` | Vista personale estesa con i dati da atleta |
 | Utente con qualifica di istruttore | `istruttore@piscina.local` | `Istruttore123!` | Vista personale estesa con i dati da istruttore |
 | Utente atleta e istruttore | `atleta.istruttore@piscina.local` | `Completo123!` | Vista personale con entrambe le qualifiche |
 
-La prospettiva **Club** si prova accedendo come Amministratore e aprendo la
-sezione **Club e squadre**. Gli accessi documentati seguono quindi le classi di
-utenza definite nella relazione.
+I tre profili applicativi corrispondono alle prospettive **Amministratore**,
+**Club** e **Utente** della relazione. L'Amministratore può consultare anche la
+sezione **Club e squadre**, mentre l'account Club è limitato alle funzionalità
+della propria prospettiva.
 
 La registrazione dall'interfaccia crea sempre un account utente di base.
 Atleta e istruttore non sono account o profili di autenticazione distinti:
@@ -167,10 +169,11 @@ sono qualifiche della persona collegata, ricavate rispettivamente dalle tabelle
 `ATLETA` e `ISTRUTTORE`. Un utente può possederle entrambe.
 
 La tabella tecnica `ACCOUNT` supporta esclusivamente l'autenticazione
-dell'interfaccia e non fa parte del modello concettuale della piscina. Le
-prospettive Utente, Club e Amministratore non introducono nuove entità del
-dominio. Le password sono protette con PBKDF2-HMAC-SHA256, salt distinto per
-account e 210.000 iterazioni.
+dell'interfaccia e non fa parte del modello concettuale della piscina. Il
+campo `Ruolo` ammette `AMMINISTRATORE`, `CLUB` e `UTENTE`, che realizzano
+nell'applicazione le tre prospettive senza introdurre nuove entità del dominio.
+Le password sono protette con PBKDF2-HMAC-SHA256, salt distinto per account e
+210.000 iterazioni.
 
 ## Architettura applicativa
 
