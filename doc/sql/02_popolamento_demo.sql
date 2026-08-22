@@ -321,44 +321,57 @@ WHERE u.Email = 'cliente@piscina.local'
             ap.ID_Attivita_Programmata
   );
 
--- INTO ACCESSO_NUOTO_LIBERO
---    (ID_Abbonamento, ID_Attivita_Programmata, Data_Ora_Accesso)
--- FROM ABBONAMENTO a
--- JOIN TIPO_ABBONAMENTO t
---  ON t.ID_Tipo_Abbonamento = a.ID_Tipo_Abbonamento
--- JOIN UTENTE u ON u.ID_Utente = a.ID_Utente
--- JOIN ATTIVITA_PROGRAMMATA ap
---  ON ap.Titolo = 'Nuoto libero demo'
--- WHERE u.Email = 'cliente@piscina.local'
---  AND t.Nome = 'Dieci ingressi'
--- AND NOT EXISTS (
---      SELECT 1 FROM ACCESSO_NUOTO_LIBERO x
---      WHERE x.ID_Abbonamento = a.ID_Abbonamento
---        AND x.ID_Attivita_Programmata =
---            ap.ID_Attivita_Programmata
---        AND DATE(x.Data_Ora_Accesso) = CURRENT_DATE
---  );
+/*
+INSERT INTO ACCESSO_NUOTO_LIBERO
+    (ID_Abbonamento, ID_Attivita_Programmata, Data_Ora_Accesso)
+SELECT a.ID_Abbonamento, ap.ID_Attivita_Programmata, CURRENT_TIMESTAMP
+FROM ABBONAMENTO a
+JOIN TIPO_ABBONAMENTO t
+  ON t.ID_Tipo_Abbonamento = a.ID_Tipo_Abbonamento
+JOIN UTENTE u ON u.ID_Utente = a.ID_Utente
+JOIN ATTIVITA_PROGRAMMATA ap
+  ON ap.Titolo = 'Nuoto libero demo'
+WHERE u.Email = 'cliente@piscina.local'
+  AND t.Nome = 'Dieci ingressi'
+  AND NOT EXISTS (
+      SELECT 1 FROM ACCESSO_NUOTO_LIBERO x
+      WHERE x.ID_Abbonamento = a.ID_Abbonamento
+        AND x.ID_Attivita_Programmata =
+            ap.ID_Attivita_Programmata
+        AND DATE(x.Data_Ora_Accesso) = CURRENT_DATE
+  );
+*/
 
--- Memorizziamo l'ID in una variabile temporanea per evitare l'errore 1442
-SET @id_abbonamento_cliente = (
-    SELECT a.ID_Abbonamento 
-    FROM ABBONAMENTO a 
-    JOIN TIPO_ABBONAMENTO t ON t.ID_Tipo_Abbonamento = a.ID_Tipo_Abbonamento 
-    JOIN UTENTE u ON u.ID_Utente = a.ID_Utente 
-    WHERE u.Email = 'cliente@piscina.local' AND t.Nome = 'Dieci ingressi' 
-    LIMIT 1
-);
+-- 1. Resettiamo le variabili per sicurezza
+SET @id_abb = NULL;
+SET @id_att = NULL;
 
-SET @id_attivita_libera = (
-    SELECT ID_Attivita_Programmata 
-    FROM ATTIVITA_PROGRAMMATA 
-    WHERE Titolo = 'Nuoto libero demo' 
-    LIMIT 1
-);
+-- 2. Leggiamo i dati dalla tabella ABBONAMENTO e li salviamo in memoria
+SELECT a.ID_Abbonamento, ap.ID_Attivita_Programmata 
+INTO @id_abb, @id_att
+FROM ABBONAMENTO a
+JOIN TIPO_ABBONAMENTO t
+  ON t.ID_Tipo_Abbonamento = a.ID_Tipo_Abbonamento
+JOIN UTENTE u ON u.ID_Utente = a.ID_Utente
+JOIN ATTIVITA_PROGRAMMATA ap
+  ON ap.Titolo = 'Nuoto libero demo'
+WHERE u.Email = 'cliente@piscina.local'
+  AND t.Nome = 'Dieci ingressi'
+  AND NOT EXISTS (
+      SELECT 1 FROM ACCESSO_NUOTO_LIBERO x
+      WHERE x.ID_Abbonamento = a.ID_Abbonamento
+        AND x.ID_Attivita_Programmata = ap.ID_Attivita_Programmata
+        AND DATE(x.Data_Ora_Accesso) = CURRENT_DATE
+  )
+LIMIT 1;
 
--- Inseriamo l'accesso usando le variabili, così la tabella ABBONAMENTO non va in conflitto
-INSERT INTO ACCESSO_NUOTO_LIBERO (ID_Abbonamento, ID_Attivita_Programmata, Data_Ora_Accesso)
-VALUES (@id_abbonamento_cliente, @id_attivita_libera, CURRENT_TIMESTAMP);
+-- 3. Eseguiamo l'inserimento usando solo le variabili (nessun conflitto)
+INSERT INTO ACCESSO_NUOTO_LIBERO
+    (ID_Abbonamento, ID_Attivita_Programmata, Data_Ora_Accesso)
+SELECT @id_abb, @id_att, CURRENT_TIMESTAMP
+WHERE @id_abb IS NOT NULL;
+
+
 
 -- ===========================================================================
 -- ACCOUNT TECNICI DELL'INTERFACCIA
