@@ -158,6 +158,7 @@ public final class UtentiPanel extends JPanel {
         return footer;
     }
 
+    /*
     private void configureActions() {
         newButton.addActionListener(event -> {
             final Utente input = UtenteFormDialog.show(this, null);
@@ -177,6 +178,30 @@ public final class UtentiPanel extends JPanel {
         });
         deactivateButton.addActionListener(event -> deactivateSelected());
         refreshButton.addActionListener(event -> reloadData());
+        table.addMouseListener(new java.awt.event.MouseAdapter() {
+            @Override
+            public void mouseClicked(final java.awt.event.MouseEvent event) {
+                if (event.getClickCount() == 2) {
+                    editButton.doClick();
+                }
+            }
+        });
+    }
+    */
+
+    private void configureActions() {
+        newButton.addActionListener(event -> createWithRetry(null));
+
+        editButton.addActionListener(event -> {
+            final Utente selected = selectedUser();
+            if (selected != null) {
+                editWithRetry(selected);
+            }
+        });
+
+        deactivateButton.addActionListener(event -> deactivateSelected());
+        refreshButton.addActionListener(event -> reloadData());
+
         table.addMouseListener(new java.awt.event.MouseAdapter() {
             @Override
             public void mouseClicked(final java.awt.event.MouseEvent event) {
@@ -212,7 +237,7 @@ public final class UtentiPanel extends JPanel {
             JOptionPane.WARNING_MESSAGE
         );
         if (answer == JOptionPane.YES_OPTION) {
-            runMutation(() -> controller.disattivaUtente(selected.id()));
+            runMutation(() -> controller.disattivaUtente(selected.id()), null);
         }
     }
 
@@ -231,7 +256,7 @@ public final class UtentiPanel extends JPanel {
         return tableModel.getUtente(modelRow);
     }
 
-    private void runMutation(final Runnable mutation) {
+    private void runMutation(final Runnable mutation, final Runnable onFailure) {
         setBusy(true, "Salvataggio in corso...");
         new SwingWorker<Void, Void>() {
             @Override
@@ -252,9 +277,30 @@ public final class UtentiPanel extends JPanel {
                 } catch (ExecutionException exception) {
                     showError(errorMessage(exception.getCause()));
                     setBusy(false, null);
+                    if (onFailure != null) onFailure.run();
                 }
             }
         }.execute();
+    }
+
+    private void createWithRetry(final Utente previousInput) {
+        final Utente input = UtenteFormDialog.show(this, previousInput);
+        if (input != null) {
+            runMutation(
+                () -> controller.creaUtente(input),
+                () -> createWithRetry(input) // In caso di errore, riapre con i dati inseriti
+            );
+        }
+    }
+
+    private void editWithRetry(final Utente previousInput) {
+        final Utente input = UtenteFormDialog.show(this, previousInput);
+        if (input != null) {
+            runMutation(
+                () -> controller.modificaUtente(input),
+                () -> editWithRetry(input) // In caso di errore, riapre con i dati inseriti
+            );
+        }
     }
 
     private void setBusy(final boolean busy, final String message) {
