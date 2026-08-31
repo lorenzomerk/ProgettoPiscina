@@ -41,9 +41,8 @@ public final class UtentiPanel extends JPanel {
     private final JButton newButton = new JButton("Nuovo utente");
     private final JButton editButton = new JButton("Modifica");
     private final JButton deactivateButton = new JButton("Disattiva");
-    private final JButton refreshButton = new JButton("Aggiorna");
     private final JTextField searchField = new JTextField(15);
-    private final JButton searchButton = new JButton("Cerca");
+    private final JButton searchButton = new JButton("Cerca/aggiorna");
 
     public UtentiPanel(
             final UtentiController controller,
@@ -123,12 +122,10 @@ public final class UtentiPanel extends JPanel {
         PoolTheme.stylePrimaryButton(newButton);
         styleSecondaryButton(editButton);
         styleDangerButton(deactivateButton);
-        styleSecondaryButton(refreshButton);
 
         toolbar.add(newButton);
         toolbar.add(editButton);
         toolbar.add(deactivateButton);
-        toolbar.add(refreshButton);
 
         styleSecondaryButton(searchButton);
         final JLabel searchLabel = new JLabel("   Cerca:");
@@ -225,7 +222,6 @@ public final class UtentiPanel extends JPanel {
         });
 
         deactivateButton.addActionListener(event -> deactivateSelected());
-        refreshButton.addActionListener(event -> reloadData());
 
         table.addMouseListener(new java.awt.event.MouseAdapter() {
             @Override
@@ -335,7 +331,6 @@ public final class UtentiPanel extends JPanel {
         newButton.setEnabled(!busy);
         editButton.setEnabled(!busy);
         deactivateButton.setEnabled(!busy);
-        refreshButton.setEnabled(!busy);
         table.setEnabled(!busy);
         if (message != null) {
             statusLabel.setText(message);
