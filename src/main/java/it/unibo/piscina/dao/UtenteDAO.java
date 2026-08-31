@@ -13,4 +13,6 @@ public interface UtenteDAO {
     boolean update(Utente utente);
 
     boolean deactivate(long id);
+
+    List<Utente> search(String keyword);
 }

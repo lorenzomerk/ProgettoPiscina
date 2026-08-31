@@ -148,4 +148,11 @@ public final class UtenteService {
         final String normalized = optional(value);
         return normalized.isEmpty() ? null : normalized;
     }
+
+    public List<Utente> cercaUtenti(final String keyword) {
+        if (keyword == null || keyword.trim().isEmpty()) {
+            return caricaUtenti();
+        }
+        return List.copyOf(utenteDAO.search(keyword.trim()));
+    }
 }

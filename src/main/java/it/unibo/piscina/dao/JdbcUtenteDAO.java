@@ -55,6 +55,30 @@ public final class JdbcUtenteDAO implements UtenteDAO {
         UPDATE UTENTE SET Attivo = FALSE WHERE ID_Utente = ?
         """;
 
+        private static final String SEARCH_USER = """
+        SELECT ID_Utente, Codice_Fiscale, Nome, Cognome,
+               Data_Nascita, Data_Registrazione, Email, Telefono,
+               Scadenza_Certificato_Medico, Attivo,
+               EXISTS (
+                   SELECT 1 FROM ATLETA a
+                   WHERE a.ID_Utente = u.ID_Utente
+               ) AS Atleta,
+               EXISTS (
+                   SELECT 1 FROM ISTRUTTORE i
+                   WHERE i.ID_Utente = u.ID_Utente
+               ) AS Istruttore,
+               (
+                   SELECT i.Qualifica FROM ISTRUTTORE i
+                   WHERE i.ID_Utente = u.ID_Utente
+               ) AS Qualifica_Istruttore
+        FROM UTENTE u
+        WHERE LOWER(Nome) LIKE ? 
+           OR LOWER(Cognome) LIKE ? 
+           OR LOWER(CONCAT(Nome, ' ', Cognome)) LIKE ? 
+           OR LOWER(CONCAT(Cognome, ' ', Nome)) LIKE ?
+        ORDER BY Cognome, Nome, ID_Utente
+        """;
+
     private final ConnectionFactory connectionFactory;
 
     public JdbcUtenteDAO(final ConnectionFactory connectionFactory) {
@@ -263,5 +287,28 @@ public final class JdbcUtenteDAO implements UtenteDAO {
                 + "eseguito.",
             exception
         );
+    }
+
+    @Override
+    public List<Utente> search(final String keyword) {
+        final List<Utente> utenti = new ArrayList<>();
+        try (Connection connection = connectionFactory.openConnection();
+             PreparedStatement statement = connection.prepareStatement(SEARCH_USER)) {
+            
+            final String pattern = "%" + keyword.toLowerCase(java.util.Locale.ROOT) + "%";
+            statement.setString(1, pattern);
+            statement.setString(2, pattern);
+            statement.setString(3, pattern);
+            statement.setString(4, pattern);
+            
+            try (ResultSet resultSet = statement.executeQuery()) {
+                while (resultSet.next()) {
+                    utenti.add(mapUtente(resultSet));
+                }
+            }
+            return utenti;
+        } catch (SQLException exception) {
+            throw databaseError("cercare gli utenti", exception);
+        }
     }
 }

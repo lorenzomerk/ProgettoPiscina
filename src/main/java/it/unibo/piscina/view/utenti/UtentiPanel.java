@@ -24,6 +24,7 @@ import javax.swing.JOptionPane;
 import javax.swing.JPanel;
 import javax.swing.JScrollPane;
 import javax.swing.JTable;
+import javax.swing.JTextField;
 import javax.swing.ListSelectionModel;
 import javax.swing.SwingWorker;
 
@@ -41,6 +42,8 @@ public final class UtentiPanel extends JPanel {
     private final JButton editButton = new JButton("Modifica");
     private final JButton deactivateButton = new JButton("Disattiva");
     private final JButton refreshButton = new JButton("Aggiorna");
+    private final JTextField searchField = new JTextField(15);
+    private final JButton searchButton = new JButton("Cerca");
 
     public UtentiPanel(
             final UtentiController controller,
@@ -53,11 +56,18 @@ public final class UtentiPanel extends JPanel {
     }
 
     public void reloadData() {
+        final String keyword = searchField.getText().trim();
         setBusy(true, "Caricamento utenti...");
+        
         new SwingWorker<List<Utente>, Void>() {
             @Override
             protected List<Utente> doInBackground() {
-                return controller.caricaUtenti();
+                // Seleziona se caricare tutto o filtrare per parola chiave
+                if (keyword.isEmpty()) {
+                    return controller.caricaUtenti();
+                } else {
+                    return controller.cercaUtenti(keyword);
+                }
             }
 
             @Override
@@ -66,7 +76,7 @@ public final class UtentiPanel extends JPanel {
                     final List<Utente> utenti = get();
                     tableModel.setUtenti(utenti);
                     statusLabel.setText(
-                        utenti.size() + " utenti registrati"
+                        utenti.size() + " risultati trovati"
                     );
                 } catch (InterruptedException exception) {
                     Thread.currentThread().interrupt();
@@ -119,6 +129,21 @@ public final class UtentiPanel extends JPanel {
         toolbar.add(editButton);
         toolbar.add(deactivateButton);
         toolbar.add(refreshButton);
+
+        styleSecondaryButton(searchButton);
+        final JLabel searchLabel = new JLabel("   Cerca:");
+        searchLabel.setFont(BODY_FONT);
+        searchLabel.setForeground(TEXT);
+        
+        searchField.setBorder(BorderFactory.createCompoundBorder(
+            BorderFactory.createLineBorder(new Color(180, 204, 214)),
+            BorderFactory.createEmptyBorder(5, 8, 5, 8)
+        ));
+        
+        toolbar.add(searchLabel);
+        toolbar.add(searchField);
+        toolbar.add(searchButton);
+
         return toolbar;
     }
 
@@ -210,6 +235,9 @@ public final class UtentiPanel extends JPanel {
                 }
             }
         });
+
+        searchButton.addActionListener(event -> reloadData());
+        searchField.addActionListener(event -> reloadData());
     }
 
     private void deactivateSelected() {

@@ -29,4 +29,8 @@ public final class UtentiController {
     public void disattivaUtente(final long id) {
         utenteService.disattivaUtente(id);
     }
+
+    public List<Utente> cercaUtenti(final String keyword) {
+        return utenteService.cercaUtenti(keyword);
+    }
 }
