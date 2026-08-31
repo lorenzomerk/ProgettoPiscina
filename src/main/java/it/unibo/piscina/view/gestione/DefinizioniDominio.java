@@ -309,7 +309,7 @@ public final class DefinizioniDominio {
                         TESTO_LUNGO, false
                     )
                 ),
-                true, true, false
+                true, true, true
             ),
             definizioneAttivitaProgrammate(true),
             new DefinizioneEntita(
@@ -410,7 +410,7 @@ public final class DefinizioniDominio {
                 CampoEntita.solaLettura("Tipo", "Tipo"),
                 CampoEntita.solaLettura("Modalità", "Modalita")
             ),
-            writable, writable, false
+            writable, writable, writable
         );
     }
 
@@ -529,7 +529,7 @@ public final class DefinizioniDominio {
                         "Tipologia", "Tipologia", TESTO, true
                     )
                 ),
-                true, true, false
+                true, true, true
             ),
             new DefinizioneEntita(
                 "Corsie",
@@ -612,7 +612,7 @@ public final class DefinizioniDominio {
                         "Indirizzo", "Indirizzo", TESTO, false
                     )
                 ),
-                true, true, false
+                true, true, true
             ),
             new DefinizioneEntita(
                 "Squadre",
@@ -636,7 +636,7 @@ public final class DefinizioniDominio {
                     ),
                     CampoEntita.solaLettura("Club", "Club")
                 ),
-                true, true, false
+                true, true, true
             ),
             new DefinizioneEntita(
                 "Appartenenze degli atleti",
