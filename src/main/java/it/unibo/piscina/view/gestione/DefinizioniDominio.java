@@ -453,7 +453,7 @@ public final class DefinizioniDominio {
                 CampoEntita.solaLettura("Utente", "Utente"),
                 CampoEntita.solaLettura("Attività", "Attivita")
             ),
-            writable, false, false
+            writable, false, writable
         );
     }
 
@@ -791,7 +791,7 @@ public final class DefinizioniDominio {
                     fields,
                     true,
                     false,
-                    false
+                    true
                 )
             );
         }

@@ -372,6 +372,67 @@ SELECT @id_abb, @id_att, CURRENT_TIMESTAMP
 WHERE @id_abb IS NOT NULL;
 
 
+-- 1. Creazione di un'attività completa (con 1 solo posto disponibile)
+INSERT INTO ATTIVITA_PROGRAMMATA
+    (ID_Tipo_Attivita, Titolo, Giorno_Settimanale,
+     Ora_Inizio, Ora_Fine, Capienza_Massima,
+     Periodo_Inizio, Periodo_Fine, Stato)
+SELECT ID_Tipo_Attivita, 'Corso esclusivo al completo', @giorno_corrente,
+       '14:00:00', '15:00:00', 1,
+       DATE_SUB(CURRENT_DATE, INTERVAL 30 DAY),
+       DATE_ADD(CURRENT_DATE, INTERVAL 60 DAY), 'PROGRAMMATA'
+FROM TIPO_ATTIVITA
+WHERE Nome = 'Corso di nuoto'
+  AND NOT EXISTS (
+      SELECT 1 FROM ATTIVITA_PROGRAMMATA
+      WHERE Titolo = 'Corso esclusivo al completo'
+  );
+
+-- 2. Creazione della Corsia 4 nella Vasca principale
+INSERT IGNORE INTO CORSIA (ID_Vasca, Numero)
+SELECT ID_Vasca, 4
+FROM VASCA
+WHERE Nome = 'Vasca principale';
+
+-- 3. Assegnazione della nuova corsia all'attività
+INSERT IGNORE INTO UTILIZZA
+    (ID_Attivita_Programmata, ID_Vasca, Numero_Corsia)
+SELECT ap.ID_Attivita_Programmata, v.ID_Vasca, 4
+FROM ATTIVITA_PROGRAMMATA ap
+JOIN VASCA v ON v.Nome = 'Vasca principale'
+WHERE ap.Titolo = 'Corso esclusivo al completo';
+
+-- 4. Assegnazione istruttore
+INSERT IGNORE INTO ASSEGNATO_A
+    (ID_Utente_Istruttore, ID_Attivita_Programmata)
+SELECT u.ID_Utente, ap.ID_Attivita_Programmata
+FROM UTENTE u
+JOIN ATTIVITA_PROGRAMMATA ap
+  ON ap.Titolo = 'Corso esclusivo al completo'
+WHERE u.Email = 'istruttore@piscina.local';
+
+-- 5. Attivazione dell'attività
+UPDATE ATTIVITA_PROGRAMMATA
+SET Stato = 'ATTIVA'
+WHERE Titolo = 'Corso esclusivo al completo';
+
+-- 6. Iscrizione dell'utente cliente
+INSERT INTO ISCRIZIONE_ATTIVITA
+    (ID_Abbonamento, ID_Attivita_Programmata, Data_Iscrizione)
+SELECT a.ID_Abbonamento, ap.ID_Attivita_Programmata, CURRENT_DATE
+FROM ABBONAMENTO a
+JOIN TIPO_ABBONAMENTO t
+  ON t.ID_Tipo_Abbonamento = a.ID_Tipo_Abbonamento
+JOIN UTENTE u ON u.ID_Utente = a.ID_Utente
+JOIN ATTIVITA_PROGRAMMATA ap
+  ON ap.Titolo = 'Corso esclusivo al completo'
+WHERE u.Email = 'cliente@piscina.local'
+  AND t.Nome = 'Annuale corsi'
+  AND NOT EXISTS (
+      SELECT 1 FROM ISCRIZIONE_ATTIVITA i
+      WHERE i.ID_Abbonamento = a.ID_Abbonamento
+        AND i.ID_Attivita_Programmata = ap.ID_Attivita_Programmata
+  );
 
 -- ===========================================================================
 -- ACCOUNT TECNICI DELL'INTERFACCIA
