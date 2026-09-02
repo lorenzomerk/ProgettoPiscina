@@ -434,6 +434,78 @@ WHERE u.Email = 'cliente@piscina.local'
         AND i.ID_Attivita_Programmata = ap.ID_Attivita_Programmata
   );
 
+-- ESPANSIONE DATI DEMO: CASI LIMITE, STORICO E NUOVI CLUB
+
+-- 1. Utente con abbonamento ad ingressi esaurito.
+
+-- A. Creazione Utente
+INSERT IGNORE INTO UTENTE
+    (Codice_Fiscale, Nome, Cognome, Data_Nascita, Email, Telefono, Scadenza_Certificato_Medico)
+VALUES
+    ('VRDLGI70A01H501K', 'Luigi', 'Verdi', '1970-05-05',
+     'scaduto@piscina.local', '3335555555', DATE_SUB(CURRENT_DATE, INTERVAL 1 YEAR));
+
+-- B. Creazione Offerta (Inganno per il trigger: partiamo da 2 ingressi)
+INSERT INTO TIPO_ABBONAMENTO
+    (Nome, Costo, Attivo, Modalita_Validita, Condizioni_Utilizzo, Durata_Giorni, Numero_Ingressi)
+VALUES
+    ('Ingresso Singolo', 8.50, FALSE, 'INGRESSI', 'Singolo accesso al nuoto libero', NULL, 2)
+ON DUPLICATE KEY UPDATE Costo = VALUES(Costo), Numero_Ingressi = VALUES(Numero_Ingressi);
+
+INSERT IGNORE INTO COMPATIBILITA (ID_Tipo_Abbonamento, ID_Tipo_Attivita)
+SELECT ta.ID_Tipo_Abbonamento, tt.ID_Tipo_Attivita
+FROM TIPO_ABBONAMENTO ta JOIN TIPO_ATTIVITA tt
+WHERE ta.Nome = 'Ingresso Singolo' AND tt.Nome = 'Nuoto libero';
+
+UPDATE TIPO_ABBONAMENTO SET Attivo = TRUE WHERE Nome = 'Ingresso Singolo';
+
+-- C. Acquisto pulito
+INSERT INTO ABBONAMENTO
+    (ID_Utente, ID_Tipo_Abbonamento, Data_Acquisto, Data_Inizio, Data_Fine, Stato, Ingressi_Rimanenti)
+SELECT u.ID_Utente, t.ID_Tipo_Abbonamento, 
+       DATE_SUB(CURRENT_DATE, INTERVAL 10 DAY), 
+       DATE_SUB(CURRENT_DATE, INTERVAL 10 DAY), 
+       NULL, 'ATTIVO', 2
+FROM UTENTE u JOIN TIPO_ABBONAMENTO t ON t.Nome = 'Ingresso Singolo'
+WHERE u.Email = 'scaduto@piscina.local';
+
+-- D. Consumo effettivo (Il decremento lo porterà matematicamente a 0 senza errori)
+SET @storico_abb = NULL;
+SET @storico_att = NULL;
+
+SELECT a.ID_Abbonamento, ap.ID_Attivita_Programmata 
+INTO @storico_abb, @storico_att
+FROM ABBONAMENTO a
+JOIN TIPO_ABBONAMENTO t ON t.ID_Tipo_Abbonamento = a.ID_Tipo_Abbonamento
+JOIN UTENTE u ON u.ID_Utente = a.ID_Utente
+JOIN ATTIVITA_PROGRAMMATA ap ON ap.Titolo = 'Nuoto libero demo'
+WHERE u.Email = 'scaduto@piscina.local' AND t.Nome = 'Ingresso Singolo'
+LIMIT 1;
+
+INSERT INTO ACCESSO_NUOTO_LIBERO
+    (ID_Abbonamento, ID_Attivita_Programmata, Data_Ora_Accesso)
+SELECT @storico_abb, @storico_att, DATE_SUB(CURRENT_TIMESTAMP, INTERVAL 7 DAY)
+WHERE @storico_abb IS NOT NULL;
+
+-- 2. Nuovo Club e Nuova Squadra
+INSERT INTO CLUB_SPORTIVO (Nome, Email, Telefono, Indirizzo)
+VALUES ('Delfini Blu', 'info@delfiniblu.example', '0519999999', 'Via del Mare 2, Bologna')
+ON DUPLICATE KEY UPDATE Email = VALUES(Email);
+
+INSERT INTO SQUADRA (ID_Club, Nome, Categoria)
+SELECT ID_Club, 'Esordienti A', 'Junior'
+FROM CLUB_SPORTIVO WHERE Nome = 'Delfini Blu'
+ON DUPLICATE KEY UPDATE Categoria = VALUES(Categoria);
+
+-- 3. Attività Storica (Conclusa)
+INSERT INTO ATTIVITA_PROGRAMMATA
+    (ID_Tipo_Attivita, Titolo, Giorno_Settimanale, Ora_Inizio, Ora_Fine, Capienza_Massima, Periodo_Inizio, Periodo_Fine, Stato)
+SELECT ID_Tipo_Attivita, 'Corso estivo passato', 'LUNEDI', '16:00:00', '17:00:00', 15,
+       DATE_SUB(CURRENT_DATE, INTERVAL 1 YEAR), DATE_SUB(CURRENT_DATE, INTERVAL 11 MONTH), 'CONCLUSA'
+FROM TIPO_ATTIVITA WHERE Nome = 'Corso di nuoto'
+  AND NOT EXISTS (SELECT 1 FROM ATTIVITA_PROGRAMMATA WHERE Titolo = 'Corso estivo passato');
+
+
 -- ===========================================================================
 -- ACCOUNT TECNICI DELL'INTERFACCIA
 -- ===========================================================================
