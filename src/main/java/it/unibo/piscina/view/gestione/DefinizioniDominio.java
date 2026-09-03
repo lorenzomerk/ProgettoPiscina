@@ -747,6 +747,7 @@ public final class DefinizioniDominio {
         );
     }
 
+    /*
     private static List<DefinizioneEntita> vistaUtente(
             final String section,
             final SessioneUtente session) {
@@ -784,6 +785,7 @@ public final class DefinizioniDominio {
                 "ID_Abbonamento",
                 personalSubscriptionsLookup(id)
             ));
+
             return List.of(
                 definizioneAttivitaProgrammate(false),
                 withPermissions(
@@ -812,6 +814,89 @@ public final class DefinizioniDominio {
                 filtered, fields, true, false, false
             ));
         }
+        return List.of();
+    }
+
+    */
+
+    private static List<DefinizioneEntita> vistaUtente(
+            final String section,
+            final SessioneUtente session) {
+        if (session.utenteId() == null) {
+            return List.of();
+        }
+        
+        final long id = session.utenteId();
+        
+        if ("Abbonamenti".equals(section)) {
+            final DefinizioneEntita filtered = readOnlyFiltered(
+                definizioneAbbonamentiAcquistati(false),
+                " WHERE a.ID_Utente = " + id
+            );
+            final List<CampoEntita> fields =
+                new ArrayList<>(filtered.campi());
+            fields.set(1, CampoEntita.riferimento(
+                "Utente",
+                "ID_Utente",
+                personalUserLookup(id)
+            ));
+            return List.of(withPermissions(
+                filtered, fields, true, false, false
+            ));
+        }
+        
+        if ("Attività".equals(section)) {
+            final DefinizioneEntita filteredRegistrations =
+                readOnlyFiltered(
+                    definizioneIscrizioni(false),
+                    " WHERE a.ID_Utente = " + id
+                );
+            final List<CampoEntita> fields =
+                new ArrayList<>(filteredRegistrations.campi());
+            fields.set(1, CampoEntita.riferimento(
+                "Abbonamento",
+                "ID_Abbonamento",
+                personalSubscriptionsLookup(id)
+            ));
+            
+            final List<DefinizioneEntita> result = new ArrayList<>();
+            
+            // Inietta il calendario completo come prima scheda per gli atleti
+            if (session.haQualifica(it.unibo.piscina.model.QualificaUtente.ATLETA)) {
+                result.add(definizioneIlMioCalendario(id));
+            }
+            
+            // Viste operative standard (Catalogo e Gestione Iscrizioni)
+            result.add(definizioneAttivitaProgrammate(false));
+            result.add(withPermissions(
+                filteredRegistrations,
+                fields,
+                true,
+                false,
+                true
+            ));
+            
+            return result;
+        }
+        
+        if ("Accessi".equals(section)) {
+            final DefinizioneEntita access = accessi().getFirst();
+            final DefinizioneEntita filtered = readOnlyFiltered(
+                access,
+                " WHERE a.ID_Utente = " + id
+            );
+            final List<CampoEntita> fields =
+                new ArrayList<>(filtered.campi());
+            fields.set(1, CampoEntita.riferimento(
+                "Abbonamento",
+                "ID_Abbonamento",
+                personalSubscriptionsLookup(id)
+            ));
+            return List.of(withPermissions(
+                filtered, fields, true, false, false
+            ));
+        }
+        
         return List.of();
     }
 
@@ -914,6 +999,90 @@ public final class DefinizioniDominio {
             WHERE a.ID_Utente = %d
             ORDER BY a.Data_Acquisto DESC
             """.formatted(userId);
+    }
+
+
+    /*
+    private static DefinizioneEntita definizioneAttivitaSquadra(final long idUtente) {
+        return new DefinizioneEntita(
+            "Allenamenti di squadra",
+            "Attività programmate a cui partecipano le tue squadre",
+            "ATTIVITA_PROGRAMMATA",
+            """
+            SELECT ap.ID_Attivita_Programmata AS ID,
+                   ap.Titolo,
+                   ap.Giorno_Settimanale AS Giorno,
+                   ap.Ora_Inizio AS Inizio,
+                   ap.Ora_Fine AS Fine,
+                   sq.Nome AS Squadra
+            FROM ATTIVITA_PROGRAMMATA ap
+            JOIN SVOLGE sv ON ap.ID_Attivita_Programmata = sv.ID_Attivita_Programmata
+            JOIN SQUADRA sq ON sv.ID_Squadra = sq.ID_Squadra
+            JOIN APPARTENENZA_SQUADRA asq ON sq.ID_Squadra = asq.ID_Squadra
+            WHERE asq.ID_Utente_Atleta = %d
+              AND CURRENT_DATE BETWEEN asq.Data_Inizio AND COALESCE(asq.Data_Fine, '9999-12-31')
+              AND ap.Stato IN ('PROGRAMMATA', 'ATTIVA')
+            ORDER BY ap.Periodo_Inizio DESC, ap.Ora_Inizio
+            """.formatted(idUtente),
+            List.of(
+                CampoEntita.id("ID", "ID_Attivita_Programmata"),
+                CampoEntita.solaLettura("Titolo", "Titolo"),
+                CampoEntita.solaLettura("Giorno", "Giorno"),
+                CampoEntita.solaLettura("Inizio", "Inizio"),
+                CampoEntita.solaLettura("Fine", "Fine"),
+                CampoEntita.solaLettura("Squadra", "Squadra")
+            ),
+            false, false, false // Imposta la tabella in sola lettura
+        );
+    }
+
+    */
+
+    private static DefinizioneEntita definizioneIlMioCalendario(final long idUtente) {
+        return new DefinizioneEntita(
+            "Il mio calendario",
+            "Tutti i tuoi corsi individuali e gli allenamenti di squadra",
+            "ATTIVITA_PROGRAMMATA",
+            """
+            SELECT ap.ID_Attivita_Programmata AS ID,
+                   ap.Titolo,
+                   ap.Giorno_Settimanale AS Giorno,
+                   ap.Ora_Inizio AS Inizio,
+                   ap.Ora_Fine AS Fine,
+                   'Iscrizione individuale' AS Origine
+            FROM ATTIVITA_PROGRAMMATA ap
+            JOIN ISCRIZIONE_ATTIVITA i ON ap.ID_Attivita_Programmata = i.ID_Attivita_Programmata
+            JOIN ABBONAMENTO a ON i.ID_Abbonamento = a.ID_Abbonamento
+            WHERE a.ID_Utente = %1$d
+              AND ap.Stato IN ('PROGRAMMATA', 'ATTIVA')
+
+            UNION ALL
+
+            SELECT ap.ID_Attivita_Programmata AS ID,
+                   ap.Titolo,
+                   ap.Giorno_Settimanale AS Giorno,
+                   ap.Ora_Inizio AS Inizio,
+                   ap.Ora_Fine AS Fine,
+                   CONCAT('Squadra: ', sq.Nome) AS Origine
+            FROM ATTIVITA_PROGRAMMATA ap
+            JOIN SVOLGE sv ON ap.ID_Attivita_Programmata = sv.ID_Attivita_Programmata
+            JOIN SQUADRA sq ON sv.ID_Squadra = sq.ID_Squadra
+            JOIN APPARTENENZA_SQUADRA asq ON sq.ID_Squadra = asq.ID_Squadra
+            WHERE asq.ID_Utente_Atleta = %1$d
+              AND CURRENT_DATE BETWEEN asq.Data_Inizio AND COALESCE(asq.Data_Fine, '9999-12-31')
+              AND ap.Stato IN ('PROGRAMMATA', 'ATTIVA')
+            ORDER BY Giorno, Inizio
+            """.formatted(idUtente),
+            List.of(
+                CampoEntita.id("ID", "ID"),
+                CampoEntita.solaLettura("Titolo", "Titolo"),
+                CampoEntita.solaLettura("Giorno", "Giorno"),
+                CampoEntita.solaLettura("Ora inizio", "Inizio"),
+                CampoEntita.solaLettura("Ora fine", "Fine"),
+                CampoEntita.solaLettura("Origine", "Origine")
+            ),
+            false, false, false
+        );
     }
 
     private static String insertBeforeOrderBy(

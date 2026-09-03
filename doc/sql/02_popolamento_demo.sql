@@ -506,6 +506,82 @@ FROM TIPO_ATTIVITA WHERE Nome = 'Corso di nuoto'
   AND NOT EXISTS (SELECT 1 FROM ATTIVITA_PROGRAMMATA WHERE Titolo = 'Corso estivo passato');
 
 
+  -- ===========================================================================
+-- POPOLAMENTO AGGIUNTIVO: ATLETI E ISTRUTTORI PER LE SQUADRE
+-- ===========================================================================
+
+-- 1. Creazione delle anagrafiche per i nuovi sportivi
+INSERT IGNORE INTO UTENTE
+    (Codice_Fiscale, Nome, Cognome, Data_Nascita, Email, Telefono, Scadenza_Certificato_Medico)
+VALUES
+    ('MRCJNR10A01H501A', 'Marco', 'Junior', '2010-01-01', 'junior1@piscina.local', '3336666661', '2027-12-31'),
+    ('SFAGVN11B02H501B', 'Sofia', 'Giovane', '2011-02-02', 'junior2@piscina.local', '3336666662', '2027-12-31'),
+    ('LCAMST95C03H501C', 'Luca', 'Master', '1995-03-03', 'senior2@piscina.local', '3336666663', '2027-12-31'),
+    ('GLACCH85D04H501D', 'Giulia', 'Coach', '1985-04-04', 'coach@piscina.local', '3336666664', '2027-12-31');
+
+-- 2. Assegnazione delle qualifiche di dominio
+INSERT IGNORE INTO ATLETA (ID_Utente)
+SELECT ID_Utente FROM UTENTE 
+WHERE Email IN ('junior1@piscina.local', 'junior2@piscina.local', 'senior2@piscina.local');
+
+INSERT INTO ISTRUTTORE (ID_Utente, Qualifica)
+SELECT ID_Utente, 'Allenatore giovanile' FROM UTENTE WHERE Email = 'coach@piscina.local'
+ON DUPLICATE KEY UPDATE Qualifica = VALUES(Qualifica);
+
+-- 3. Appartenenza alle Squadre (Atleti)
+-- Inseriamo Marco e Sofia nella nuova squadra "Esordienti A" dei Delfini Blu
+INSERT INTO APPARTENENZA_SQUADRA (ID_Utente_Atleta, ID_Squadra, Data_Inizio, Data_Fine)
+SELECT u.ID_Utente, s.ID_Squadra, DATE_SUB(CURRENT_DATE, INTERVAL 60 DAY), NULL
+FROM UTENTE u CROSS JOIN SQUADRA s
+WHERE u.Email IN ('junior1@piscina.local', 'junior2@piscina.local') AND s.Nome = 'Esordienti A'
+  AND NOT EXISTS (
+      SELECT 1 FROM APPARTENENZA_SQUADRA a 
+      WHERE a.ID_Utente_Atleta = u.ID_Utente AND a.Data_Fine IS NULL
+  );
+
+-- Inseriamo Luca nella squadra "Agonistica Senior" per fare compagnia ad Alice e Andrea
+INSERT INTO APPARTENENZA_SQUADRA (ID_Utente_Atleta, ID_Squadra, Data_Inizio, Data_Fine)
+SELECT u.ID_Utente, s.ID_Squadra, DATE_SUB(CURRENT_DATE, INTERVAL 90 DAY), NULL
+FROM UTENTE u CROSS JOIN SQUADRA s
+WHERE u.Email = 'senior2@piscina.local' AND s.Nome = 'Agonistica Senior'
+  AND NOT EXISTS (
+      SELECT 1 FROM APPARTENENZA_SQUADRA a 
+      WHERE a.ID_Utente_Atleta = u.ID_Utente AND a.Data_Fine IS NULL
+  );
+
+-- 4. Incarichi per le Squadre (Istruttori)
+-- Assegniamo la nuova istruttrice Giulia alla guida degli Esordienti A
+INSERT INTO INCARICO_SQUADRA (ID_Utente_Istruttore, ID_Squadra, Data_Inizio, Data_Fine)
+SELECT u.ID_Utente, s.ID_Squadra, DATE_SUB(CURRENT_DATE, INTERVAL 60 DAY), NULL
+FROM UTENTE u CROSS JOIN SQUADRA s
+WHERE u.Email = 'coach@piscina.local' AND s.Nome = 'Esordienti A'
+  AND NOT EXISTS (
+      SELECT 1 FROM INCARICO_SQUADRA i 
+      WHERE i.ID_Utente_Istruttore = u.ID_Utente AND i.ID_Squadra = s.ID_Squadra AND i.Data_Fine IS NULL
+  );
+
+-- Assegniamo l'istruttore esistente (Ivo) come supporto alla Agonistica Senior
+INSERT INTO INCARICO_SQUADRA (ID_Utente_Istruttore, ID_Squadra, Data_Inizio, Data_Fine)
+SELECT u.ID_Utente, s.ID_Squadra, DATE_SUB(CURRENT_DATE, INTERVAL 120 DAY), NULL
+FROM UTENTE u CROSS JOIN SQUADRA s
+WHERE u.Email = 'istruttore@piscina.local' AND s.Nome = 'Agonistica Senior'
+  AND NOT EXISTS (
+      SELECT 1 FROM INCARICO_SQUADRA i 
+      WHERE i.ID_Utente_Istruttore = u.ID_Utente AND i.ID_Squadra = s.ID_Squadra AND i.Data_Fine IS NULL
+  );
+
+-- 5. Creazione degli account per permetterti di accedere con i nuovi profili
+-- Usa "Atleta123!" per gli atleti e "Istruttore123!" per il coach
+INSERT INTO ACCOUNT
+    (ID_Utente, Nome, Cognome, Email, Password_Hash, Password_Salt, Password_Iterazioni, Ruolo, Attivo)
+VALUES
+    ((SELECT ID_Utente FROM UTENTE WHERE Email = 'junior1@piscina.local'), 'Marco', 'Junior', 'junior1@piscina.local', 'PmjNbf+5NUapBahRJ40e3Oxl86hc1aWjrqOOl4ZQdek=', 'GAPxreqWrnOdXDdta1KyYQ==', 210000, 'UTENTE', TRUE),
+    ((SELECT ID_Utente FROM UTENTE WHERE Email = 'junior2@piscina.local'), 'Sofia', 'Giovane', 'junior2@piscina.local', 'PmjNbf+5NUapBahRJ40e3Oxl86hc1aWjrqOOl4ZQdek=', 'GAPxreqWrnOdXDdta1KyYQ==', 210000, 'UTENTE', TRUE),
+    ((SELECT ID_Utente FROM UTENTE WHERE Email = 'senior2@piscina.local'), 'Luca', 'Master', 'senior2@piscina.local', 'PmjNbf+5NUapBahRJ40e3Oxl86hc1aWjrqOOl4ZQdek=', 'GAPxreqWrnOdXDdta1KyYQ==', 210000, 'UTENTE', TRUE),
+    ((SELECT ID_Utente FROM UTENTE WHERE Email = 'coach@piscina.local'), 'Giulia', 'Coach', 'coach@piscina.local', 'Ci2KFGEU0mCQn+865yHDg4bRUQlaYs+NAqpCKyOOjfk=', 'ByawZajFziCzwe/ZARpaJg==', 210000, 'UTENTE', TRUE)
+ON DUPLICATE KEY UPDATE ID_Utente = VALUES(ID_Utente), Attivo = TRUE;
+
+
 -- ===========================================================================
 -- ACCOUNT TECNICI DELL'INTERFACCIA
 -- ===========================================================================
