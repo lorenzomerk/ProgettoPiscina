@@ -1265,6 +1265,8 @@ CREATE TRIGGER TR_SVOLGE_BI
 BEFORE INSERT ON SVOLGE
 FOR EACH ROW
 BEGIN
+    DECLARE v_stato VARCHAR(20);
+
     IF NOT EXISTS (
         SELECT 1
           FROM ATTIVITA_PROGRAMMATA ap
@@ -1277,6 +1279,17 @@ BEGIN
         SIGNAL SQLSTATE '45000'
             SET MESSAGE_TEXT =
                 'La squadra puo svolgere solo attivita di squadra';
+    END IF;
+
+    -- Nuovo controllo di integrità temporale
+    SELECT Stato INTO v_stato
+      FROM ATTIVITA_PROGRAMMATA
+     WHERE ID_Attivita_Programmata = NEW.ID_Attivita_Programmata;
+
+    IF v_stato IN ('CONCLUSA', 'ANNULLATA') THEN
+        SIGNAL SQLSTATE '45000'
+            SET MESSAGE_TEXT =
+                'Impossibile associare la squadra: attivita conclusa o annullata';
     END IF;
 END$$
 

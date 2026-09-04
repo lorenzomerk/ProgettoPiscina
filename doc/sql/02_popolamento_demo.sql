@@ -131,7 +131,7 @@ WHERE Nome = 'Vasca riabilitativa';
 INSERT INTO CLUB_SPORTIVO (Nome, Email, Telefono, Indirizzo)
 VALUES (
     'Nuoto Emilia',
-    'segreteria@nuotoemilia.example',
+    'club@piscina.local',
     '0510000000',
     'Via delle Piscine 1, Bologna'
 )
