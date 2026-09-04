@@ -9,8 +9,6 @@ import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
-import java.sql.Statement;
-import java.sql.Types;
 import java.util.EnumSet;
 import java.util.Objects;
 import java.util.Optional;
@@ -19,9 +17,13 @@ import java.util.Optional;
 public final class JdbcAccountDAO implements AccountDAO {
 
     private static final String FIND_BY_EMAIL = """
-        SELECT A.ID_Account, A.ID_Utente, A.Nome, A.Cognome, A.Email,
+        SELECT A.ID_Account, A.ID_Utente, A.ID_Club,
+               A.Nome, A.Cognome, A.Email,
                A.Password_Hash, A.Password_Salt, A.Password_Iterazioni,
-               A.Ruolo, A.Attivo,
+               A.Ruolo,
+               (A.Attivo AND (
+                   A.Ruolo <> 'UTENTE' OR COALESCE(U.Attivo, FALSE)
+               )) AS Attivo,
                EXISTS (
                    SELECT 1
                    FROM ATLETA AT
@@ -33,14 +35,8 @@ public final class JdbcAccountDAO implements AccountDAO {
                    WHERE I.ID_Utente = A.ID_Utente
                ) AS Qualifica_Istruttore
         FROM ACCOUNT A
+        LEFT JOIN UTENTE U ON U.ID_Utente = A.ID_Utente
         WHERE A.Email = ?
-        """;
-
-    private static final String INSERT = """
-        INSERT INTO ACCOUNT
-            (ID_Utente, Nome, Cognome, Email, Password_Hash, Password_Salt,
-             Password_Iterazioni, Ruolo, Attivo)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
         """;
 
     private static final String RECORD_ACCESS = """
@@ -75,46 +71,6 @@ public final class JdbcAccountDAO implements AccountDAO {
     }
 
     @Override
-    public long insert(final AccountAutenticazione account) {
-        try (Connection connection = connectionFactory.openConnection();
-                PreparedStatement statement = connection.prepareStatement(
-                    INSERT,
-                    Statement.RETURN_GENERATED_KEYS
-                )) {
-
-            if (account.utenteId() == null) {
-                statement.setNull(1, Types.BIGINT);
-            } else {
-                statement.setLong(1, account.utenteId());
-            }
-            statement.setString(2, account.nome());
-            statement.setString(3, account.cognome());
-            statement.setString(4, account.email());
-            statement.setString(5, account.passwordHash());
-            statement.setString(6, account.passwordSalt());
-            statement.setInt(7, account.passwordIterazioni());
-            statement.setString(8, account.ruolo().name());
-            statement.setBoolean(9, account.attivo());
-            statement.executeUpdate();
-
-            try (ResultSet keys = statement.getGeneratedKeys()) {
-                if (keys.next()) {
-                    return keys.getLong(1);
-                }
-            }
-            throw new DAOException(
-                "Account creato senza identificativo generato"
-            );
-        } catch (SQLException exception) {
-            if (exception.getSQLState() != null
-                    && exception.getSQLState().startsWith("23")) {
-                throw new DAOException("Email già registrata", exception);
-            }
-            throw databaseError("creare l'account", exception);
-        }
-    }
-
-    @Override
     public void recordSuccessfulAccess(final long accountId) {
         try (Connection connection = connectionFactory.openConnection();
                 PreparedStatement statement =
@@ -143,9 +99,11 @@ public final class JdbcAccountDAO implements AccountDAO {
             qualifiche.add(QualificaUtente.ISTRUTTORE);
         }
         final Number utenteId = (Number) resultSet.getObject("ID_Utente");
+        final Number clubId = (Number) resultSet.getObject("ID_Club");
         return new AccountAutenticazione(
             resultSet.getLong("ID_Account"),
             utenteId == null ? null : utenteId.longValue(),
+            clubId == null ? null : clubId.longValue(),
             resultSet.getString("Nome"),
             resultSet.getString("Cognome"),
             resultSet.getString("Email"),

@@ -8,6 +8,7 @@ import java.util.StringJoiner;
 public record SessioneUtente(
     long accountId,
     Long utenteId,
+    Long clubId,
     String nome,
     String cognome,
     String email,

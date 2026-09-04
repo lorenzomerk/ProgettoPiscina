@@ -374,6 +374,7 @@ CREATE TABLE IF NOT EXISTS SVOLGE (
 CREATE TABLE IF NOT EXISTS ACCOUNT (
     ID_Account BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
     ID_Utente BIGINT UNSIGNED,
+    ID_Club BIGINT UNSIGNED,
     Nome VARCHAR(80) NOT NULL,
     Cognome VARCHAR(80) NOT NULL,
     Email VARCHAR(255) NOT NULL,
@@ -387,10 +388,15 @@ CREATE TABLE IF NOT EXISTS ACCOUNT (
     CONSTRAINT PK_ACCOUNT PRIMARY KEY (ID_Account),
     CONSTRAINT UQ_ACCOUNT_EMAIL UNIQUE (Email),
     CONSTRAINT UQ_ACCOUNT_UTENTE UNIQUE (ID_Utente),
+    CONSTRAINT UQ_ACCOUNT_CLUB UNIQUE (ID_Club),
     CONSTRAINT FK_ACCOUNT_UTENTE FOREIGN KEY (ID_Utente)
         REFERENCES UTENTE (ID_Utente)
         ON UPDATE CASCADE
-        ON DELETE SET NULL,
+        ON DELETE RESTRICT,
+    CONSTRAINT FK_ACCOUNT_CLUB FOREIGN KEY (ID_Club)
+        REFERENCES CLUB_SPORTIVO (ID_Club)
+        ON UPDATE CASCADE
+        ON DELETE RESTRICT,
     CONSTRAINT CK_ACCOUNT_RUOLO CHECK (
         Ruolo IN (
             'AMMINISTRATORE', 'CLUB', 'UTENTE'
@@ -398,6 +404,14 @@ CREATE TABLE IF NOT EXISTS ACCOUNT (
     ),
     CONSTRAINT CK_ACCOUNT_ITERAZIONI CHECK (
         Password_Iterazioni >= 100000
+    ),
+    CONSTRAINT CK_ACCOUNT_COLLEGAMENTO CHECK (
+        (Ruolo = 'AMMINISTRATORE'
+            AND ID_Utente IS NULL AND ID_Club IS NULL)
+        OR (Ruolo = 'CLUB'
+            AND ID_Utente IS NULL AND ID_Club IS NOT NULL)
+        OR (Ruolo = 'UTENTE'
+            AND ID_Utente IS NOT NULL AND ID_Club IS NULL)
     )
 );
 
@@ -1053,8 +1067,8 @@ BEGIN
 
     IF v_modalita_validita = 'INGRESSI' THEN
         UPDATE ABBONAMENTO
-           SET Ingressi_Rimanenti = Ingressi_Rimanenti - 1,
-               Stato = IF(Ingressi_Rimanenti - 1 = 0,
+           SET Ingressi_Rimanenti = v_ingressi - 1,
+               Stato = IF(v_ingressi - 1 = 0,
                           'ESAURITO', 'ATTIVO')
          WHERE ID_Abbonamento = NEW.ID_Abbonamento;
     END IF;

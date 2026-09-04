@@ -1,4 +1,4 @@
-package it.unibo.piscina.view.gestione;
+package it.unibo.piscina.service;
 
 import static it.unibo.piscina.model.TipoCampo.BOOLEANO;
 import static it.unibo.piscina.model.TipoCampo.DATA;
@@ -16,8 +16,8 @@ import it.unibo.piscina.model.SessioneUtente;
 import java.util.ArrayList;
 import java.util.List;
 
-/** Catalogo dei moduli ricavato dalle entità e associazioni della relazione. */
-public final class DefinizioniDominio {
+/** Catalogo applicativo dei moduli, delle query e dei relativi permessi. */
+public final class CatalogoDominio {
 
     private static final String LOOKUP_UTENTI = """
         SELECT ID_Utente,
@@ -124,7 +124,7 @@ public final class DefinizioniDominio {
         FROM CLUB_SPORTIVO ORDER BY Nome
         """;
 
-    private DefinizioniDominio() {
+    private CatalogoDominio() {
     }
 
     public static List<DefinizioneEntita> perSezione(
@@ -457,7 +457,7 @@ public final class DefinizioniDominio {
                 CampoEntita.solaLettura("Utente", "Utente"),
                 CampoEntita.solaLettura("Attività", "Attivita")
             ),
-            writable, false, writable
+            writable, false, false
         );
     }
 
@@ -751,78 +751,6 @@ public final class DefinizioniDominio {
         );
     }
 
-    /*
-    private static List<DefinizioneEntita> vistaUtente(
-            final String section,
-            final SessioneUtente session) {
-
-        if (session.utenteId() == null) {
-            return List.of();
-        }
-        final long id = session.utenteId();
-        if ("Abbonamenti".equals(section)) {
-            final DefinizioneEntita filtered = readOnlyFiltered(
-                definizioneAbbonamentiAcquistati(false),
-                " WHERE a.ID_Utente = " + id
-            );
-            final List<CampoEntita> fields =
-                new ArrayList<>(filtered.campi());
-            fields.set(1, CampoEntita.riferimento(
-                "Utente",
-                "ID_Utente",
-                personalUserLookup(id)
-            ));
-            return List.of(withPermissions(
-                filtered, fields, true, false, false
-            ));
-        }
-        if ("Attività".equals(section)) {
-            final DefinizioneEntita filteredRegistrations =
-                readOnlyFiltered(
-                    definizioneIscrizioni(false),
-                    " WHERE a.ID_Utente = " + id
-                );
-            final List<CampoEntita> fields =
-                new ArrayList<>(filteredRegistrations.campi());
-            fields.set(1, CampoEntita.riferimento(
-                "Abbonamento",
-                "ID_Abbonamento",
-                personalSubscriptionsLookup(id)
-            ));
-
-            return List.of(
-                definizioneAttivitaProgrammate(false),
-                withPermissions(
-                    filteredRegistrations,
-                    fields,
-                    true,
-                    false,
-                    true
-                )
-            );
-        }
-        if ("Accessi".equals(section)) {
-            final DefinizioneEntita access = accessi().getFirst();
-            final DefinizioneEntita filtered = readOnlyFiltered(
-                access,
-                " WHERE a.ID_Utente = " + id
-            );
-            final List<CampoEntita> fields =
-                new ArrayList<>(filtered.campi());
-            fields.set(1, CampoEntita.riferimento(
-                "Abbonamento",
-                "ID_Abbonamento",
-                personalSubscriptionsLookup(id)
-            ));
-            return List.of(withPermissions(
-                filtered, fields, true, false, false
-            ));
-        }
-        return List.of();
-    }
-
-    */
-
     private static List<DefinizioneEntita> vistaUtente(
             final String section,
             final SessioneUtente session) {
@@ -877,7 +805,7 @@ public final class DefinizioniDominio {
                 fields,
                 true,
                 false,
-                true
+                false
             ));
             
             return result;
@@ -1004,44 +932,6 @@ public final class DefinizioniDominio {
             ORDER BY a.Data_Acquisto DESC
             """.formatted(userId);
     }
-
-
-    /*
-    private static DefinizioneEntita definizioneAttivitaSquadra(final long idUtente) {
-        return new DefinizioneEntita(
-            "Allenamenti di squadra",
-            "Attività programmate a cui partecipano le tue squadre",
-            "ATTIVITA_PROGRAMMATA",
-            """
-            SELECT ap.ID_Attivita_Programmata AS ID,
-                   ap.Titolo,
-                   ap.Giorno_Settimanale AS Giorno,
-                   ap.Ora_Inizio AS Inizio,
-                   ap.Ora_Fine AS Fine,
-                   sq.Nome AS Squadra
-            FROM ATTIVITA_PROGRAMMATA ap
-            JOIN SVOLGE sv ON ap.ID_Attivita_Programmata = sv.ID_Attivita_Programmata
-            JOIN SQUADRA sq ON sv.ID_Squadra = sq.ID_Squadra
-            JOIN APPARTENENZA_SQUADRA asq ON sq.ID_Squadra = asq.ID_Squadra
-            WHERE asq.ID_Utente_Atleta = %d
-              AND CURRENT_DATE BETWEEN asq.Data_Inizio AND COALESCE(asq.Data_Fine, '9999-12-31')
-              AND ap.Stato IN ('PROGRAMMATA', 'ATTIVA')
-            ORDER BY ap.Periodo_Inizio DESC, ap.Ora_Inizio
-            """.formatted(idUtente),
-            List.of(
-                CampoEntita.id("ID", "ID_Attivita_Programmata"),
-                CampoEntita.solaLettura("Titolo", "Titolo"),
-                CampoEntita.solaLettura("Giorno", "Giorno"),
-                CampoEntita.solaLettura("Inizio", "Inizio"),
-                CampoEntita.solaLettura("Fine", "Fine"),
-                CampoEntita.solaLettura("Squadra", "Squadra")
-            ),
-            false, false, false // Imposta la tabella in sola lettura
-        );
-    }
-
-    */
-
     private static DefinizioneEntita definizioneIlMioCalendario(final long idUtente) {
         return new DefinizioneEntita(
             "Il mio calendario",
@@ -1092,110 +982,111 @@ public final class DefinizioniDominio {
     private static List<DefinizioneEntita> vistaClub(
             final String section,
             final SessioneUtente session) {
-        
+
+        if (session.clubId() == null) {
+            return List.of();
+        }
+        final long clubId = session.clubId();
+
         if ("Attività".equals(section)) {
-            // 1. Tipi di attività disabilitati (sola lettura)
             final DefinizioneEntita baseTipi = attivita().get(0);
             final DefinizioneEntita tipiSolaLettura = new DefinizioneEntita(
                 baseTipi.titolo(),
-                "Visualizzazione dei tipi di attività (solo l'Amministratore può crearne)",
+                "Tipi di attività disponibili, in sola lettura",
                 baseTipi.tabella(),
                 baseTipi.querySelezione(),
                 baseTipi.campi(),
-                false, false, false // Disabilita Insert, Update, Delete
+                false, false, false
             );
-            
-            // 2. Istruttori assegnati (Menu a tendina filtrato tramite l'email del Club)
-            final DefinizioneEntita baseAssegnazioni = attivita().get(2);
-            final List<CampoEntita> campiFiltrati = new ArrayList<>(baseAssegnazioni.campi());
-            
-            campiFiltrati.set(0, CampoEntita.chiave(
-                "Istruttore", 
-                "ID_Utente_Istruttore", 
+            final DefinizioneEntita attivitaDelClub = readOnlyFiltered(
+                definizioneAttivitaProgrammate(false),
                 """
-                SELECT DISTINCT i.ID_Utente, CONCAT(u.Cognome, ' ', u.Nome, ' - ', i.Qualifica)
-                FROM ISTRUTTORE i
-                JOIN UTENTE u ON i.ID_Utente = u.ID_Utente
-                JOIN INCARICO_SQUADRA inc ON i.ID_Utente = inc.ID_Utente_Istruttore
-                JOIN SQUADRA sq ON inc.ID_Squadra = sq.ID_Squadra
-                JOIN CLUB_SPORTIVO c ON sq.ID_Club = c.ID_Club
-                WHERE c.Email = '%s'
-                """.formatted(session.email())
-            ));
-            
-            final DefinizioneEntita assegnazioniSicure = new DefinizioneEntita(
-                baseAssegnazioni.titolo(),
-                "Assegnazioni limitate agli istruttori in organico alle proprie squadre",
-                baseAssegnazioni.tabella(),
-                baseAssegnazioni.querySelezione(),
-                campiFiltrati,
-                true, false, true
+                 WHERE EXISTS (
+                    SELECT 1
+                    FROM SVOLGE x
+                    JOIN SQUADRA s ON s.ID_Squadra = x.ID_Squadra
+                    WHERE x.ID_Attivita_Programmata =
+                          ap.ID_Attivita_Programmata
+                      AND s.ID_Club = %d
+                 )
+                """.formatted(clubId)
             );
-            
-            return List.of(
-                tipiSolaLettura,
-                attivita().get(1), // Attività programmate (libere)
-                assegnazioniSicure,
-                attivita().get(3)  // Iscrizioni (libere)
-            );
+            return List.of(tipiSolaLettura, attivitaDelClub);
         }
         if ("Club e squadre".equals(section)) {
             final List<DefinizioneEntita> base = clubESquadre();
-            final String email = session.email();
-            
-            // Filtri SQL comuni basati sull'email dell'account Club loggato
-            final String filtroClub = " WHERE Email = '" + email + "' ";
-            final String filtroSquadre = " WHERE c.Email = '" + email + "' ";
-            final String filtroInSubquery = " WHERE s.ID_Club IN (SELECT ID_Club FROM CLUB_SPORTIVO WHERE Email = '" + email + "') ";
+            final String filtroClub = " WHERE ID_Club = " + clubId + " ";
+            final String filtroSquadre =
+                " WHERE s.ID_Club = " + clubId + " ";
 
-            // 1. Il Club (Vede solo se stesso. Può modificare i propri contatti, ma non inserire o eliminare)
             final DefinizioneEntita club = new DefinizioneEntita(
-                "Il mio Club", base.get(0).descrizione(), base.get(0).tabella(),
+                "Il mio club",
+                base.get(0).descrizione(),
+                base.get(0).tabella(),
                 insertBeforeOrderBy(base.get(0).querySelezione(), filtroClub),
                 base.get(0).campi(), false, true, false
             );
 
-            // 2. Le Squadre (Vede e gestisce solo le proprie)
-            final List<CampoEntita> campiSquadre = new ArrayList<>(base.get(1).campi());
-            // Forza il menu a tendina del Club a mostrare SOLO il proprio club
-            campiSquadre.set(1, CampoEntita.chiave("Club", "ID_Club", 
-                "SELECT ID_Club, Nome FROM CLUB_SPORTIVO" + filtroClub));
-            
+            final List<CampoEntita> campiSquadre =
+                new ArrayList<>(base.get(1).campi());
+            campiSquadre.set(1, CampoEntita.chiave(
+                "Club",
+                "ID_Club",
+                "SELECT ID_Club, Nome FROM CLUB_SPORTIVO" + filtroClub
+            ));
             final DefinizioneEntita squadre = new DefinizioneEntita(
-                "Le mie Squadre", base.get(1).descrizione(), base.get(1).tabella(),
+                "Le mie squadre",
+                base.get(1).descrizione(),
+                base.get(1).tabella(),
                 insertBeforeOrderBy(base.get(1).querySelezione(), filtroSquadre),
                 campiSquadre, true, true, true
             );
 
-            // 3. Appartenenza Atleti (Vede e iscrive atleti solo alle proprie squadre)
-            final List<CampoEntita> campiAtleti = new ArrayList<>(base.get(2).campi());
-            // Forza il menu a tendina delle squadre a mostrare SOLO quelle del club
-            campiAtleti.set(2, CampoEntita.chiave("Squadra", "ID_Squadra", squadreDelClubLookup(email)));
-            
+            final List<CampoEntita> campiAtleti =
+                new ArrayList<>(base.get(2).campi());
+            campiAtleti.set(2, CampoEntita.chiave(
+                "Squadra", "ID_Squadra", squadreDelClubLookup(clubId)
+            ));
             final DefinizioneEntita atleti = new DefinizioneEntita(
-                base.get(2).titolo(), base.get(2).descrizione(), base.get(2).tabella(),
-                insertBeforeOrderBy(base.get(2).querySelezione(), filtroInSubquery),
+                base.get(2).titolo(),
+                base.get(2).descrizione(),
+                base.get(2).tabella(),
+                insertBeforeOrderBy(
+                    base.get(2).querySelezione(),
+                    filtroSquadre
+                ),
                 campiAtleti, true, true, false
             );
 
-            // 4. Incarichi Istruttori (Vede e assegna istruttori solo alle proprie squadre)
-            final List<CampoEntita> campiIstruttori = new ArrayList<>(base.get(3).campi());
-            // Forza il menu a tendina delle squadre
-            campiIstruttori.set(2, CampoEntita.chiave("Squadra", "ID_Squadra", squadreDelClubLookup(email)));
-            
+            final List<CampoEntita> campiIstruttori =
+                new ArrayList<>(base.get(3).campi());
+            campiIstruttori.set(2, CampoEntita.chiave(
+                "Squadra", "ID_Squadra", squadreDelClubLookup(clubId)
+            ));
             final DefinizioneEntita istruttori = new DefinizioneEntita(
-                base.get(3).titolo(), base.get(3).descrizione(), base.get(3).tabella(),
-                insertBeforeOrderBy(base.get(3).querySelezione(), filtroInSubquery),
+                base.get(3).titolo(),
+                base.get(3).descrizione(),
+                base.get(3).tabella(),
+                insertBeforeOrderBy(
+                    base.get(3).querySelezione(),
+                    filtroSquadre
+                ),
                 campiIstruttori, true, true, false
             );
 
-            // 5. Attività di squadra (SVOLGE) (Vede e associa solo le proprie squadre)
-            final List<CampoEntita> campiSvolge = new ArrayList<>(base.get(4).campi());
-            campiSvolge.set(0, CampoEntita.chiave("Squadra", "ID_Squadra", squadreDelClubLookup(email)));
-            
+            final List<CampoEntita> campiSvolge =
+                new ArrayList<>(base.get(4).campi());
+            campiSvolge.set(0, CampoEntita.chiave(
+                "Squadra", "ID_Squadra", squadreDelClubLookup(clubId)
+            ));
             final DefinizioneEntita svolge = new DefinizioneEntita(
-                base.get(4).titolo(), "Associa le tue squadre alle attività programmate", base.get(4).tabella(),
-                insertBeforeOrderBy(base.get(4).querySelezione(), filtroInSubquery),
+                base.get(4).titolo(),
+                "Associa le tue squadre alle attività programmate",
+                base.get(4).tabella(),
+                insertBeforeOrderBy(
+                    base.get(4).querySelezione(),
+                    filtroSquadre
+                ),
                 campiSvolge, true, false, true
             );
 
@@ -1205,15 +1096,15 @@ public final class DefinizioniDominio {
         return List.of();
     }
 
-    // Genera il menu a tendina mostrando SOLO le squadre appartenenti al Club loggato
-    private static String squadreDelClubLookup(final String emailClub) {
+    private static String squadreDelClubLookup(final long clubId) {
         return """
-            SELECT s.ID_Squadra, CONCAT(s.Nome, ' - ', s.Categoria, ' (#', s.ID_Squadra, ')')
+            SELECT s.ID_Squadra,
+                   CONCAT(s.Nome, ' - ', s.Categoria,
+                          ' (#', s.ID_Squadra, ')')
             FROM SQUADRA s
-            JOIN CLUB_SPORTIVO c ON s.ID_Club = c.ID_Club
-            WHERE c.Email = '%s'
+            WHERE s.ID_Club = %d
             ORDER BY s.Nome
-            """.formatted(emailClub);
+            """.formatted(clubId);
     }
 
     private static String insertBeforeOrderBy(

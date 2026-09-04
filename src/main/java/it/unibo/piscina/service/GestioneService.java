@@ -5,6 +5,7 @@ import it.unibo.piscina.model.CampoEntita;
 import it.unibo.piscina.model.DatiTabella;
 import it.unibo.piscina.model.DefinizioneEntita;
 import it.unibo.piscina.model.OpzioneRiferimento;
+import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
@@ -110,9 +111,17 @@ public final class GestioneService {
         }
     }
 
-    public DatiTabella eseguiConsultazione(final String sql) {
+    public List<String> nomiRiepiloghi() {
+        return CatalogoRiepiloghi.nomi();
+    }
+
+    public DatiTabella eseguiRiepilogo(
+            final int indice,
+            final LocalDate inizio,
+            final LocalDate fine) {
+
         dao.sincronizzaStati();
-        return dao.query(sql);
+        return dao.query(CatalogoRiepiloghi.query(indice, inizio, fine));
     }
 
     private void ensureAllowed(

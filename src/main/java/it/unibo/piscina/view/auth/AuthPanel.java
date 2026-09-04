@@ -24,6 +24,7 @@ import javax.swing.BoxLayout;
 import javax.swing.JButton;
 import javax.swing.JLabel;
 import javax.swing.JPanel;
+import javax.swing.JScrollPane;
 
 /** Schermata primaria con accesso e creazione account. */
 public final class AuthPanel extends JPanel {
@@ -152,8 +153,16 @@ public final class AuthPanel extends JPanel {
         formCards.setOpaque(false);
         formCards.add(loginForm, LOGIN);
         formCards.add(registrationForm, REGISTER);
+        final JScrollPane formScroll = new JScrollPane(formCards);
+        formScroll.setBorder(null);
+        formScroll.setOpaque(false);
+        formScroll.getViewport().setOpaque(false);
+        formScroll.setHorizontalScrollBarPolicy(
+            JScrollPane.HORIZONTAL_SCROLLBAR_NEVER
+        );
+        formScroll.getVerticalScrollBar().setUnitIncrement(14);
         container.add(switcher, BorderLayout.NORTH);
-        container.add(formCards, BorderLayout.CENTER);
+        container.add(formScroll, BorderLayout.CENTER);
         return container;
     }
 

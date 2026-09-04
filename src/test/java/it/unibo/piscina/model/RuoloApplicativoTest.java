@@ -48,6 +48,7 @@ class RuoloApplicativoTest {
         final SessioneUtente session = new SessioneUtente(
             1L,
             20L,
+            null,
             "Andrea",
             "Completo",
             "andrea@example.com",

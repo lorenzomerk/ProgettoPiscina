@@ -7,6 +7,7 @@ import it.unibo.piscina.controller.UtentiController;
 import it.unibo.piscina.dao.AccountDAO;
 import it.unibo.piscina.dao.JdbcAccountDAO;
 import it.unibo.piscina.dao.JdbcGestioneDAO;
+import it.unibo.piscina.dao.JdbcRegistrazioneDAO;
 import it.unibo.piscina.dao.JdbcUtenteDAO;
 import it.unibo.piscina.dao.UtenteDAO;
 import it.unibo.piscina.data.ConnectionFactory;
@@ -37,6 +38,7 @@ public final class App {
             new JdbcAccountDAO(connectionFactory);
         final AuthService authService = new AuthService(
             accountDAO,
+            new JdbcRegistrazioneDAO(connectionFactory),
             new PasswordHasher()
         );
         final AuthController authController =

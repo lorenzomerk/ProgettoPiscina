@@ -61,7 +61,8 @@ public final class DAOUtils {
             return DriverManager.getConnection(url, user, password);
         } catch (SQLException exception) {
             throw new DAOException(
-                "Impossibile connettersi al database",
+                "Impossibile connettersi al database: "
+                    + exception.getMessage(),
                 exception
             );
         }
@@ -73,7 +74,10 @@ public final class DAOUtils {
         try (
             Connection connection = connectionFactory.openConnection();
             var statement =
-                connection.prepareStatement(Queries.HEALTH_CHECK);
+                connection.prepareStatement(
+                    "SELECT (SELECT COUNT(*) FROM UTENTE) >= 0 "
+                        + "AND (SELECT COUNT(*) FROM ACCOUNT) >= 0"
+                );
             var resultSet = statement.executeQuery()
         ) {
             if (!resultSet.next() || resultSet.getInt(1) != 1) {
@@ -112,8 +116,8 @@ public final class DAOUtils {
             Class.forName("com.mysql.cj.jdbc.Driver");
         } catch (ClassNotFoundException exception) {
             throw new DAOException(
-                "Driver MySQL JDBC non trovato: verifica che "
-                    + "lib/mysql-connector-j-9.7.0.jar sia nel classpath",
+                "Driver MySQL JDBC non trovato: verifica che il connector "
+                    + "presente in lib sia incluso nel classpath",
                 exception
             );
         }

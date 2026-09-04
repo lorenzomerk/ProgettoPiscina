@@ -22,8 +22,8 @@ ProgettoPiscina/
 │   │   └── resources/            configurazione JDBC
 │   └── test/java/                test JUnit
 ├── doc/sql/                      quattro script SQL consolidati e numerati
-├── lib/                          driver MySQL JDBC
-├── tools/                        controllo di coerenza con la relazione
+├── lib/                          MySQL Connector e JUnit standalone
+├── .vscode/                      configurazioni Run e compilazione
 └── README.md
 ```
 
@@ -107,10 +107,10 @@ abbonamento non attivo, si inseriscono le compatibilità e infine lo si attiva.
 Analogamente, un'attività viene creata come `PROGRAMMATA`, collegata ad almeno
 una corsia e agli eventuali istruttori o squadre, quindi portata ad `ATTIVA`.
 
-## Avvio manuale da PowerShell
+## Compilazione, test e avvio
 
-Il progetto viene compilato e avviato direttamente con `javac` e `java`, senza
-Gradle:
+Il progetto si compila direttamente con `javac`, come normale applicazione
+Java. I JAR necessari sono inclusi in `lib`. Da PowerShell:
 
 ```powershell
 cd "C:\Users\loren\Desktop\Uni\Basi_di_dati\ProgettoPiscina"
@@ -118,17 +118,24 @@ cd "C:\Users\loren\Desktop\Uni\Basi_di_dati\ProgettoPiscina"
 $env:PISCINA_DB_USER = "piscina_app"
 $env:PISCINA_DB_PASSWORD = "Piscina!"
 
-javac -d bin `
-    -sourcepath src/main/java `
-    -cp "lib/*" `
-    src/main/java/it/unibo/piscina/App.java
+$sources = Get-ChildItem -Recurse -Filter *.java `
+    -Path src/main/java,src/test/java
+
+javac -encoding UTF-8 -cp "lib/*" -d bin $sources.FullName
+
+java -cp "bin;lib/*" `
+    org.junit.platform.console.ConsoleLauncher `
+    execute --scan-class-path --disable-banner --details summary
 
 java -cp "bin;lib/*;src/main/resources" it.unibo.piscina.App
 ```
 
-Il driver `mysql-connector-j-9.7.0.jar` è incluso in `lib`. Le variabili
-PowerShell valgono per la sessione corrente e sovrascrivono i valori del file
-di configurazione.
+Le variabili PowerShell valgono per la sessione corrente e sovrascrivono i
+valori del file di configurazione. In Visual Studio Code sono disponibili le
+configurazioni **Avvia Gestione Piscina** ed **Esegui test**, entrambe precedute
+dalla compilazione automatica. La configurazione di avvio imposta esplicitamente
+le credenziali locali dimostrative, così eventuali variabili persistenti del
+sistema non possono sostituirle accidentalmente.
 
 ## Configurazione JDBC
 
@@ -163,7 +170,9 @@ I tre profili applicativi corrispondono alle prospettive **Amministratore**,
 sezione **Club e squadre**, mentre l'account Club è limitato alle funzionalità
 della propria prospettiva.
 
-La registrazione dall'interfaccia crea sempre un account utente di base.
+La registrazione dall'interfaccia richiede anche codice fiscale e data di
+nascita e crea, in un'unica transazione, l'anagrafica `UTENTE` e il relativo
+account di base.
 Atleta e istruttore non sono account o profili di autenticazione distinti:
 sono qualifiche della persona collegata, ricavate rispettivamente dalle tabelle
 `ATLETA` e `ISTRUTTORE`. Un utente può possederle entrambe.
@@ -172,6 +181,9 @@ La tabella tecnica `ACCOUNT` supporta esclusivamente l'autenticazione
 dell'interfaccia e non fa parte del modello concettuale della piscina. Il
 campo `Ruolo` ammette `AMMINISTRATORE`, `CLUB` e `UTENTE`, che realizzano
 nell'applicazione le tre prospettive senza introdurre nuove entità del dominio.
+Gli account `UTENTE` sono collegati a `UTENTE`, quelli `CLUB` a
+`CLUB_SPORTIVO`; gli account amministrativi non hanno un collegamento di
+dominio.
 Le password sono protette con PBKDF2-HMAC-SHA256, salt distinto per account e
 210.000 iterazioni.
 

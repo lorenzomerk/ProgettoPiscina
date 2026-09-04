@@ -187,6 +187,18 @@ class UtenteServiceTest {
         }
 
         @Override
+        public List<Utente> search(final String name) {
+            final String normalized = name == null
+                ? ""
+                : name.trim().toLowerCase();
+            return utenti.stream()
+                .filter(utente -> (
+                    utente.nome() + " " + utente.cognome()
+                ).toLowerCase().contains(normalized))
+                .toList();
+        }
+
+        @Override
         public long insert(final Utente utente) {
             final long id = nextId++;
             utenti.add(copyWithId(utente, id));

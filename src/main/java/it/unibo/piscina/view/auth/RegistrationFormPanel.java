@@ -26,6 +26,8 @@ final class RegistrationFormPanel extends JPanel {
     private final Consumer<SessioneUtente> successAction;
     private final JTextField nameField = new JTextField();
     private final JTextField surnameField = new JTextField();
+    private final JTextField fiscalCodeField = new JTextField();
+    private final JTextField birthDateField = new JTextField();
     private final JTextField emailField = new JTextField();
     private final JPasswordField passwordField = new JPasswordField();
     private final JPasswordField confirmationField = new JPasswordField();
@@ -44,6 +46,8 @@ final class RegistrationFormPanel extends JPanel {
     void reset() {
         nameField.setText("");
         surnameField.setText("");
+        fiscalCodeField.setText("");
+        birthDateField.setText("");
         emailField.setText("");
         passwordField.setText("");
         confirmationField.setText("");
@@ -51,6 +55,8 @@ final class RegistrationFormPanel extends JPanel {
         registerButton.setEnabled(true);
         nameField.setEnabled(true);
         surnameField.setEnabled(true);
+        fiscalCodeField.setEnabled(true);
+        birthDateField.setEnabled(true);
         emailField.setEnabled(true);
         passwordField.setEnabled(true);
         confirmationField.setEnabled(true);
@@ -61,6 +67,8 @@ final class RegistrationFormPanel extends JPanel {
         setOpaque(false);
         AuthUi.styleTextField(nameField);
         AuthUi.styleTextField(surnameField);
+        AuthUi.styleTextField(fiscalCodeField);
+        AuthUi.styleTextField(birthDateField);
         AuthUi.styleTextField(emailField);
         AuthUi.styleTextField(passwordField);
         AuthUi.styleTextField(confirmationField);
@@ -89,6 +97,21 @@ final class RegistrationFormPanel extends JPanel {
         addRow(AuthUi.fieldGroup("Nome", nameField), constraints, row++, 0);
         addRow(
             AuthUi.fieldGroup("Cognome", surnameField),
+            constraints,
+            row++,
+            7
+        );
+        addRow(
+            AuthUi.fieldGroup("Codice fiscale", fiscalCodeField),
+            constraints,
+            row++,
+            7
+        );
+        addRow(
+            AuthUi.fieldGroup(
+                "Data di nascita (AAAA-MM-GG)",
+                birthDateField
+            ),
             constraints,
             row++,
             7
@@ -128,6 +151,8 @@ final class RegistrationFormPanel extends JPanel {
                     return controller.registra(
                         nameField.getText(),
                         surnameField.getText(),
+                        fiscalCodeField.getText(),
+                        birthDateField.getText(),
                         emailField.getText(),
                         password,
                         confirmation
@@ -162,6 +187,8 @@ final class RegistrationFormPanel extends JPanel {
         registerButton.setEnabled(!busy);
         nameField.setEnabled(!busy);
         surnameField.setEnabled(!busy);
+        fiscalCodeField.setEnabled(!busy);
+        birthDateField.setEnabled(!busy);
         emailField.setEnabled(!busy);
         passwordField.setEnabled(!busy);
         confirmationField.setEnabled(!busy);

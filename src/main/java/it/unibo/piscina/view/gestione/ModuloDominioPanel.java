@@ -44,7 +44,7 @@ public final class ModuloDominioPanel extends JPanel {
         );
 
         final List<DefinizioneEntita> definitions =
-            DefinizioniDominio.perSezione(section, session);
+            controller.definizioniPerSezione(section, session);
         final JPanel content = new JPanel(new BorderLayout(0, 10));
         content.setOpaque(false);
         content.setBorder(

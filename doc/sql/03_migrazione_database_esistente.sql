@@ -83,6 +83,108 @@ ALTER TABLE ACCOUNT
         )
     );
 
+-- Collega ogni account alla sola identità coerente con il proprio ruolo.
+SET @add_account_club = IF(
+    EXISTS (
+        SELECT 1
+        FROM information_schema.COLUMNS
+        WHERE TABLE_SCHEMA = DATABASE()
+          AND TABLE_NAME = 'ACCOUNT'
+          AND COLUMN_NAME = 'ID_Club'
+    ),
+    'SELECT 1',
+    'ALTER TABLE ACCOUNT ADD COLUMN ID_Club BIGINT UNSIGNED NULL AFTER ID_Utente'
+);
+PREPARE add_account_club FROM @add_account_club;
+EXECUTE add_account_club;
+DEALLOCATE PREPARE add_account_club;
+
+UPDATE ACCOUNT a
+JOIN UTENTE u ON u.Email = a.Email
+SET a.ID_Utente = u.ID_Utente
+WHERE a.Ruolo = 'UTENTE'
+  AND a.ID_Utente IS NULL;
+
+UPDATE ACCOUNT a
+JOIN CLUB_SPORTIVO c
+  ON c.Email = a.Email
+  OR c.Nome = TRIM(CONCAT(a.Nome, ' ', a.Cognome))
+SET a.ID_Club = c.ID_Club
+WHERE a.Ruolo = 'CLUB'
+  AND a.ID_Club IS NULL;
+
+UPDATE ACCOUNT
+SET ID_Utente = CASE WHEN Ruolo = 'UTENTE' THEN ID_Utente END,
+    ID_Club = CASE WHEN Ruolo = 'CLUB' THEN ID_Club END;
+
+SET @add_uq_account_club = IF(
+    EXISTS (
+        SELECT 1
+        FROM information_schema.STATISTICS
+        WHERE TABLE_SCHEMA = DATABASE()
+          AND TABLE_NAME = 'ACCOUNT'
+          AND INDEX_NAME = 'UQ_ACCOUNT_CLUB'
+    ),
+    'SELECT 1',
+    'ALTER TABLE ACCOUNT ADD CONSTRAINT UQ_ACCOUNT_CLUB UNIQUE (ID_Club)'
+);
+PREPARE add_uq_account_club FROM @add_uq_account_club;
+EXECUTE add_uq_account_club;
+DEALLOCATE PREPARE add_uq_account_club;
+
+SET @drop_fk_account_utente = IF(
+    EXISTS (
+        SELECT 1
+        FROM information_schema.REFERENTIAL_CONSTRAINTS
+        WHERE CONSTRAINT_SCHEMA = DATABASE()
+          AND TABLE_NAME = 'ACCOUNT'
+          AND CONSTRAINT_NAME = 'FK_ACCOUNT_UTENTE'
+    ),
+    'ALTER TABLE ACCOUNT DROP FOREIGN KEY FK_ACCOUNT_UTENTE',
+    'SELECT 1'
+);
+PREPARE drop_fk_account_utente FROM @drop_fk_account_utente;
+EXECUTE drop_fk_account_utente;
+DEALLOCATE PREPARE drop_fk_account_utente;
+
+ALTER TABLE ACCOUNT
+    ADD CONSTRAINT FK_ACCOUNT_UTENTE FOREIGN KEY (ID_Utente)
+        REFERENCES UTENTE (ID_Utente)
+        ON UPDATE CASCADE
+        ON DELETE RESTRICT;
+
+SET @add_fk_account_club = IF(
+    EXISTS (
+        SELECT 1
+        FROM information_schema.REFERENTIAL_CONSTRAINTS
+        WHERE CONSTRAINT_SCHEMA = DATABASE()
+          AND TABLE_NAME = 'ACCOUNT'
+          AND CONSTRAINT_NAME = 'FK_ACCOUNT_CLUB'
+    ),
+    'SELECT 1',
+    'ALTER TABLE ACCOUNT ADD CONSTRAINT FK_ACCOUNT_CLUB FOREIGN KEY (ID_Club) REFERENCES CLUB_SPORTIVO (ID_Club) ON UPDATE CASCADE ON DELETE RESTRICT'
+);
+PREPARE add_fk_account_club FROM @add_fk_account_club;
+EXECUTE add_fk_account_club;
+DEALLOCATE PREPARE add_fk_account_club;
+
+-- Se esistono vecchi account UTENTE/CLUB privi di anagrafica, l'aggiunta del
+-- CHECK si arresta intenzionalmente: vanno collegati prima della migrazione.
+SET @add_account_link_check = IF(
+    EXISTS (
+        SELECT 1
+        FROM information_schema.TABLE_CONSTRAINTS
+        WHERE CONSTRAINT_SCHEMA = DATABASE()
+          AND TABLE_NAME = 'ACCOUNT'
+          AND CONSTRAINT_NAME = 'CK_ACCOUNT_COLLEGAMENTO'
+    ),
+    'SELECT 1',
+    'ALTER TABLE ACCOUNT ADD CONSTRAINT CK_ACCOUNT_COLLEGAMENTO CHECK ((Ruolo = ''AMMINISTRATORE'' AND ID_Utente IS NULL AND ID_Club IS NULL) OR (Ruolo = ''CLUB'' AND ID_Utente IS NULL AND ID_Club IS NOT NULL) OR (Ruolo = ''UTENTE'' AND ID_Utente IS NOT NULL AND ID_Club IS NULL))'
+);
+PREPARE add_account_link_check FROM @add_account_link_check;
+EXECUTE add_account_link_check;
+DEALLOCATE PREPARE add_account_link_check;
+
 -- ===========================================================================
 -- ATTRIBUTI E REGOLE REFERENZIALI DEI CAPITOLI 1-3
 -- ===========================================================================

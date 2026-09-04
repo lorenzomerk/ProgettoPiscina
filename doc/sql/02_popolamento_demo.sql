@@ -4,6 +4,7 @@
 -- e account tecnici per provare tutte le viste applicative.
 USE piscina_progetto;
 
+SET @OLD_SQL_SAFE_UPDATES = @@SQL_SAFE_UPDATES;
 SET SQL_SAFE_UPDATES = 0;
 
 -- Rimuove esclusivamente il receptionist demo delle versioni precedenti,
@@ -13,6 +14,16 @@ WHERE Email = 'reception@piscina.local'
   AND Password_Hash =
       'HT+VnzvB4Sh5Tq0YM8Ai80maVKR3V9kMsfhfFTGGReA='
   AND Password_Salt = 'apOYKLo+ZMMaLSae1vl6dw==';
+
+-- Le anagrafiche sportive restano nei dati demo, ma non hanno bisogno di un
+-- account applicativo distinto dai sei profili documentati nel README.
+DELETE FROM ACCOUNT
+WHERE Email IN (
+    'junior1@piscina.local',
+    'junior2@piscina.local',
+    'senior2@piscina.local',
+    'coach@piscina.local'
+);
 
 -- ===========================================================================
 -- UTENTI E QUALIFICHE DI DOMINIO
@@ -226,7 +237,7 @@ WHERE Nome = 'Allenamento sportivo'
       WHERE Titolo = 'Allenamento squadra demo'
   );
 
-INSERT IGNORE INTO UTILIZZA
+INSERT INTO UTILIZZA
     (ID_Attivita_Programmata, ID_Vasca, Numero_Corsia)
 SELECT ap.ID_Attivita_Programmata, v.ID_Vasca,
        CASE ap.Titolo
@@ -240,9 +251,21 @@ WHERE ap.Titolo IN (
     'Corso adulti demo',
     'Nuoto libero demo',
     'Allenamento squadra demo'
-);
+)
+  AND NOT EXISTS (
+      SELECT 1
+      FROM UTILIZZA x
+      WHERE x.ID_Attivita_Programmata =
+            ap.ID_Attivita_Programmata
+        AND x.ID_Vasca = v.ID_Vasca
+        AND x.Numero_Corsia = CASE ap.Titolo
+            WHEN 'Corso adulti demo' THEN 1
+            WHEN 'Allenamento squadra demo' THEN 2
+            ELSE 3
+        END
+  );
 
-INSERT IGNORE INTO ASSEGNATO_A
+INSERT INTO ASSEGNATO_A
     (ID_Utente_Istruttore, ID_Attivita_Programmata)
 SELECT u.ID_Utente, ap.ID_Attivita_Programmata
 FROM UTENTE u
@@ -251,15 +274,29 @@ JOIN ATTIVITA_PROGRAMMATA ap
       'Corso adulti demo',
       'Allenamento squadra demo'
   )
-WHERE u.Email = 'atleta.istruttore@piscina.local';
+WHERE u.Email = 'atleta.istruttore@piscina.local'
+  AND NOT EXISTS (
+      SELECT 1
+      FROM ASSEGNATO_A x
+      WHERE x.ID_Utente_Istruttore = u.ID_Utente
+        AND x.ID_Attivita_Programmata =
+            ap.ID_Attivita_Programmata
+  );
 
-INSERT IGNORE INTO SVOLGE
+INSERT INTO SVOLGE
     (ID_Squadra, ID_Attivita_Programmata)
 SELECT s.ID_Squadra, ap.ID_Attivita_Programmata
 FROM SQUADRA s
 JOIN ATTIVITA_PROGRAMMATA ap
   ON ap.Titolo = 'Allenamento squadra demo'
-WHERE s.Nome = 'Agonistica Senior';
+WHERE s.Nome = 'Agonistica Senior'
+  AND NOT EXISTS (
+      SELECT 1
+      FROM SVOLGE x
+      WHERE x.ID_Squadra = s.ID_Squadra
+        AND x.ID_Attivita_Programmata =
+            ap.ID_Attivita_Programmata
+  );
 
 UPDATE ATTIVITA_PROGRAMMATA
 SET Stato = 'ATTIVA'
@@ -321,34 +358,41 @@ WHERE u.Email = 'cliente@piscina.local'
             ap.ID_Attivita_Programmata
   );
 
-/*
-INSERT INTO ACCESSO_NUOTO_LIBERO
-    (ID_Abbonamento, ID_Attivita_Programmata, Data_Ora_Accesso)
-SELECT a.ID_Abbonamento, ap.ID_Attivita_Programmata, CURRENT_TIMESTAMP
-FROM ABBONAMENTO a
-JOIN TIPO_ABBONAMENTO t
-  ON t.ID_Tipo_Abbonamento = a.ID_Tipo_Abbonamento
-JOIN UTENTE u ON u.ID_Utente = a.ID_Utente
-JOIN ATTIVITA_PROGRAMMATA ap
-  ON ap.Titolo = 'Nuoto libero demo'
-WHERE u.Email = 'cliente@piscina.local'
-  AND t.Nome = 'Dieci ingressi'
-  AND NOT EXISTS (
-      SELECT 1 FROM ACCESSO_NUOTO_LIBERO x
-      WHERE x.ID_Abbonamento = a.ID_Abbonamento
-        AND x.ID_Attivita_Programmata =
-            ap.ID_Attivita_Programmata
-        AND DATE(x.Data_Ora_Accesso) = CURRENT_DATE
-  );
-*/
-
--- 1. Resettiamo le variabili per sicurezza
+-- L'accesso demo deve essere creato una sola volta e deve rispettare la
+-- pianificazione anche quando il popolamento viene rieseguito in un giorno
+-- diverso da quello della prima installazione.
 SET @id_abb = NULL;
 SET @id_att = NULL;
+SET @data_accesso_demo = NULL;
 
--- 2. Leggiamo i dati dalla tabella ABBONAMENTO e li salviamo in memoria
-SELECT a.ID_Abbonamento, ap.ID_Attivita_Programmata 
-INTO @id_abb, @id_att
+SELECT a.ID_Abbonamento,
+       ap.ID_Attivita_Programmata,
+       TIMESTAMP(
+           DATE_ADD(
+               GREATEST(ap.Periodo_Inizio, a.Data_Inizio),
+               INTERVAL MOD(
+                   FIELD(
+                       ap.Giorno_Settimanale,
+                       'LUNEDI', 'MARTEDI', 'MERCOLEDI', 'GIOVEDI',
+                       'VENERDI', 'SABATO', 'DOMENICA'
+                   ) - 1
+                   - WEEKDAY(GREATEST(ap.Periodo_Inizio, a.Data_Inizio))
+                   + 7,
+                   7
+               ) DAY
+           ),
+           ADDTIME(
+               ap.Ora_Inizio,
+               SEC_TO_TIME(
+                   FLOOR(
+                       TIME_TO_SEC(
+                           TIMEDIFF(ap.Ora_Fine, ap.Ora_Inizio)
+                       ) / 2
+                   )
+               )
+           )
+       )
+INTO @id_abb, @id_att, @data_accesso_demo
 FROM ABBONAMENTO a
 JOIN TIPO_ABBONAMENTO t
   ON t.ID_Tipo_Abbonamento = a.ID_Tipo_Abbonamento
@@ -361,15 +405,14 @@ WHERE u.Email = 'cliente@piscina.local'
       SELECT 1 FROM ACCESSO_NUOTO_LIBERO x
       WHERE x.ID_Abbonamento = a.ID_Abbonamento
         AND x.ID_Attivita_Programmata = ap.ID_Attivita_Programmata
-        AND DATE(x.Data_Ora_Accesso) = CURRENT_DATE
   )
 LIMIT 1;
 
--- 3. Eseguiamo l'inserimento usando solo le variabili (nessun conflitto)
 INSERT INTO ACCESSO_NUOTO_LIBERO
     (ID_Abbonamento, ID_Attivita_Programmata, Data_Ora_Accesso)
-SELECT @id_abb, @id_att, CURRENT_TIMESTAMP
-WHERE @id_abb IS NOT NULL;
+SELECT @id_abb, @id_att, @data_accesso_demo
+WHERE @id_abb IS NOT NULL
+  AND @data_accesso_demo IS NOT NULL;
 
 
 -- 1. Creazione di un'attività completa (con 1 solo posto disponibile)
@@ -395,21 +438,36 @@ FROM VASCA
 WHERE Nome = 'Vasca principale';
 
 -- 3. Assegnazione della nuova corsia all'attività
-INSERT IGNORE INTO UTILIZZA
+INSERT INTO UTILIZZA
     (ID_Attivita_Programmata, ID_Vasca, Numero_Corsia)
 SELECT ap.ID_Attivita_Programmata, v.ID_Vasca, 4
 FROM ATTIVITA_PROGRAMMATA ap
 JOIN VASCA v ON v.Nome = 'Vasca principale'
-WHERE ap.Titolo = 'Corso esclusivo al completo';
+WHERE ap.Titolo = 'Corso esclusivo al completo'
+  AND NOT EXISTS (
+      SELECT 1
+      FROM UTILIZZA x
+      WHERE x.ID_Attivita_Programmata =
+            ap.ID_Attivita_Programmata
+        AND x.ID_Vasca = v.ID_Vasca
+        AND x.Numero_Corsia = 4
+  );
 
 -- 4. Assegnazione istruttore
-INSERT IGNORE INTO ASSEGNATO_A
+INSERT INTO ASSEGNATO_A
     (ID_Utente_Istruttore, ID_Attivita_Programmata)
 SELECT u.ID_Utente, ap.ID_Attivita_Programmata
 FROM UTENTE u
 JOIN ATTIVITA_PROGRAMMATA ap
   ON ap.Titolo = 'Corso esclusivo al completo'
-WHERE u.Email = 'istruttore@piscina.local';
+WHERE u.Email = 'istruttore@piscina.local'
+  AND NOT EXISTS (
+      SELECT 1
+      FROM ASSEGNATO_A x
+      WHERE x.ID_Utente_Istruttore = u.ID_Utente
+        AND x.ID_Attivita_Programmata =
+            ap.ID_Attivita_Programmata
+  );
 
 -- 5. Attivazione dell'attività
 UPDATE ATTIVITA_PROGRAMMATA
@@ -445,12 +503,15 @@ VALUES
     ('VRDLGI70A01H501K', 'Luigi', 'Verdi', '1970-05-05',
      'scaduto@piscina.local', '3335555555', DATE_SUB(CURRENT_DATE, INTERVAL 1 YEAR));
 
--- B. Creazione Offerta (Inganno per il trigger: partiamo da 2 ingressi)
+-- B. Creazione dell'offerta a ingresso singolo.
 INSERT INTO TIPO_ABBONAMENTO
     (Nome, Costo, Attivo, Modalita_Validita, Condizioni_Utilizzo, Durata_Giorni, Numero_Ingressi)
 VALUES
-    ('Ingresso Singolo', 8.50, FALSE, 'INGRESSI', 'Singolo accesso al nuoto libero', NULL, 2)
-ON DUPLICATE KEY UPDATE Costo = VALUES(Costo), Numero_Ingressi = VALUES(Numero_Ingressi);
+    ('Ingresso Singolo', 8.50, FALSE, 'INGRESSI',
+     'Singolo accesso al nuoto libero', NULL, 1)
+ON DUPLICATE KEY UPDATE
+    Costo = VALUES(Costo),
+    Condizioni_Utilizzo = VALUES(Condizioni_Utilizzo);
 
 INSERT IGNORE INTO COMPATIBILITA (ID_Tipo_Abbonamento, ID_Tipo_Attivita)
 SELECT ta.ID_Tipo_Abbonamento, tt.ID_Tipo_Attivita
@@ -465,27 +526,120 @@ INSERT INTO ABBONAMENTO
 SELECT u.ID_Utente, t.ID_Tipo_Abbonamento, 
        DATE_SUB(CURRENT_DATE, INTERVAL 10 DAY), 
        DATE_SUB(CURRENT_DATE, INTERVAL 10 DAY), 
-       NULL, 'ATTIVO', 2
+       NULL, 'ATTIVO', t.Numero_Ingressi
 FROM UTENTE u JOIN TIPO_ABBONAMENTO t ON t.Nome = 'Ingresso Singolo'
-WHERE u.Email = 'scaduto@piscina.local';
+WHERE u.Email = 'scaduto@piscina.local'
+  AND NOT EXISTS (
+      SELECT 1
+      FROM ABBONAMENTO a
+      WHERE a.ID_Utente = u.ID_Utente
+        AND a.ID_Tipo_Abbonamento = t.ID_Tipo_Abbonamento
+  );
 
--- D. Consumo effettivo (Il decremento lo porterà matematicamente a 0 senza errori)
+-- D. Consumo effettivo: il trigger porta gli ingressi residui a zero.
 SET @storico_abb = NULL;
 SET @storico_att = NULL;
+SET @storico_data = NULL;
 
-SELECT a.ID_Abbonamento, ap.ID_Attivita_Programmata 
-INTO @storico_abb, @storico_att
+SELECT a.ID_Abbonamento,
+       ap.ID_Attivita_Programmata,
+       TIMESTAMP(
+           DATE_ADD(
+               GREATEST(ap.Periodo_Inizio, a.Data_Inizio),
+               INTERVAL MOD(
+                   FIELD(
+                       ap.Giorno_Settimanale,
+                       'LUNEDI', 'MARTEDI', 'MERCOLEDI', 'GIOVEDI',
+                       'VENERDI', 'SABATO', 'DOMENICA'
+                   ) - 1
+                   - WEEKDAY(GREATEST(ap.Periodo_Inizio, a.Data_Inizio))
+                   + 7,
+                   7
+               ) DAY
+           ),
+           ADDTIME(
+               ap.Ora_Inizio,
+               SEC_TO_TIME(
+                   FLOOR(
+                       TIME_TO_SEC(
+                           TIMEDIFF(ap.Ora_Fine, ap.Ora_Inizio)
+                       ) / 2
+                   )
+               )
+           )
+       )
+INTO @storico_abb, @storico_att, @storico_data
 FROM ABBONAMENTO a
 JOIN TIPO_ABBONAMENTO t ON t.ID_Tipo_Abbonamento = a.ID_Tipo_Abbonamento
 JOIN UTENTE u ON u.ID_Utente = a.ID_Utente
 JOIN ATTIVITA_PROGRAMMATA ap ON ap.Titolo = 'Nuoto libero demo'
-WHERE u.Email = 'scaduto@piscina.local' AND t.Nome = 'Ingresso Singolo'
+WHERE u.Email = 'scaduto@piscina.local'
+  AND t.Nome = 'Ingresso Singolo'
+  AND a.Ingressi_Rimanenti > 0
+  AND NOT EXISTS (
+      SELECT 1
+      FROM ACCESSO_NUOTO_LIBERO x
+      WHERE x.ID_Abbonamento = a.ID_Abbonamento
+  )
 LIMIT 1;
 
 INSERT INTO ACCESSO_NUOTO_LIBERO
     (ID_Abbonamento, ID_Attivita_Programmata, Data_Ora_Accesso)
-SELECT @storico_abb, @storico_att, DATE_SUB(CURRENT_TIMESTAMP, INTERVAL 7 DAY)
-WHERE @storico_abb IS NOT NULL;
+SELECT @storico_abb, @storico_att, @storico_data
+WHERE @storico_abb IS NOT NULL
+  AND @storico_data IS NOT NULL;
+
+-- Compatibilità con popolamenti precedenti nei quali l'offerta aveva due
+-- ingressi: se ne rimane ancora uno, viene registrato anche il secondo uso.
+SET @storico_abb = NULL;
+SET @storico_att = NULL;
+SET @storico_data = NULL;
+
+SELECT a.ID_Abbonamento,
+       ap.ID_Attivita_Programmata,
+       TIMESTAMP(
+           DATE_ADD(
+               GREATEST(ap.Periodo_Inizio, a.Data_Inizio),
+               INTERVAL MOD(
+                   FIELD(
+                       ap.Giorno_Settimanale,
+                       'LUNEDI', 'MARTEDI', 'MERCOLEDI', 'GIOVEDI',
+                       'VENERDI', 'SABATO', 'DOMENICA'
+                   ) - 1
+                   - WEEKDAY(GREATEST(ap.Periodo_Inizio, a.Data_Inizio))
+                   + 7,
+                   7
+               ) DAY
+           ),
+           ADDTIME(
+               ap.Ora_Inizio,
+               SEC_TO_TIME(
+                   FLOOR(
+                       TIME_TO_SEC(
+                           TIMEDIFF(ap.Ora_Fine, ap.Ora_Inizio)
+                       ) / 2
+                   )
+               )
+           )
+       )
+INTO @storico_abb, @storico_att, @storico_data
+FROM ABBONAMENTO a
+JOIN TIPO_ABBONAMENTO t
+  ON t.ID_Tipo_Abbonamento = a.ID_Tipo_Abbonamento
+JOIN UTENTE u ON u.ID_Utente = a.ID_Utente
+JOIN ATTIVITA_PROGRAMMATA ap
+  ON ap.Titolo = 'Nuoto libero demo'
+WHERE u.Email = 'scaduto@piscina.local'
+  AND t.Nome = 'Ingresso Singolo'
+  AND a.Ingressi_Rimanenti > 0
+LIMIT 1;
+
+INSERT INTO ACCESSO_NUOTO_LIBERO
+    (ID_Abbonamento, ID_Attivita_Programmata, Data_Ora_Accesso)
+SELECT @storico_abb, @storico_att,
+       DATE_ADD(@storico_data, INTERVAL 1 HOUR)
+WHERE @storico_abb IS NOT NULL
+  AND @storico_data IS NOT NULL;
 
 -- 2. Nuovo Club e Nuova Squadra
 INSERT INTO CLUB_SPORTIVO (Nome, Email, Telefono, Indirizzo)
@@ -570,18 +724,6 @@ WHERE u.Email = 'istruttore@piscina.local' AND s.Nome = 'Agonistica Senior'
       WHERE i.ID_Utente_Istruttore = u.ID_Utente AND i.ID_Squadra = s.ID_Squadra AND i.Data_Fine IS NULL
   );
 
--- 5. Creazione degli account per permetterti di accedere con i nuovi profili
--- Usa "Atleta123!" per gli atleti e "Istruttore123!" per il coach
-INSERT INTO ACCOUNT
-    (ID_Utente, Nome, Cognome, Email, Password_Hash, Password_Salt, Password_Iterazioni, Ruolo, Attivo)
-VALUES
-    ((SELECT ID_Utente FROM UTENTE WHERE Email = 'junior1@piscina.local'), 'Marco', 'Junior', 'junior1@piscina.local', 'PmjNbf+5NUapBahRJ40e3Oxl86hc1aWjrqOOl4ZQdek=', 'GAPxreqWrnOdXDdta1KyYQ==', 210000, 'UTENTE', TRUE),
-    ((SELECT ID_Utente FROM UTENTE WHERE Email = 'junior2@piscina.local'), 'Sofia', 'Giovane', 'junior2@piscina.local', 'PmjNbf+5NUapBahRJ40e3Oxl86hc1aWjrqOOl4ZQdek=', 'GAPxreqWrnOdXDdta1KyYQ==', 210000, 'UTENTE', TRUE),
-    ((SELECT ID_Utente FROM UTENTE WHERE Email = 'senior2@piscina.local'), 'Luca', 'Master', 'senior2@piscina.local', 'PmjNbf+5NUapBahRJ40e3Oxl86hc1aWjrqOOl4ZQdek=', 'GAPxreqWrnOdXDdta1KyYQ==', 210000, 'UTENTE', TRUE),
-    ((SELECT ID_Utente FROM UTENTE WHERE Email = 'coach@piscina.local'), 'Giulia', 'Coach', 'coach@piscina.local', 'Ci2KFGEU0mCQn+865yHDg4bRUQlaYs+NAqpCKyOOjfk=', 'ByawZajFziCzwe/ZARpaJg==', 210000, 'UTENTE', TRUE)
-ON DUPLICATE KEY UPDATE ID_Utente = VALUES(ID_Utente), Attivo = TRUE;
-
-
 -- ===========================================================================
 -- ACCOUNT TECNICI DELL'INTERFACCIA
 -- ===========================================================================
@@ -593,37 +735,40 @@ ON DUPLICATE KEY UPDATE ID_Utente = VALUES(ID_Utente), Attivo = TRUE;
 -- Entrambi:       atleta.istruttore@piscina.local / Completo123!
 
 INSERT INTO ACCOUNT
-    (ID_Utente, Nome, Cognome, Email, Password_Hash, Password_Salt,
-     Password_Iterazioni, Ruolo, Attivo)
+    (ID_Utente, ID_Club, Nome, Cognome, Email,
+     Password_Hash, Password_Salt, Password_Iterazioni, Ruolo, Attivo)
 VALUES
-    (NULL, 'Ada', 'Amministratrice', 'admin@piscina.local',
+    (NULL, NULL, 'Ada', 'Amministratrice', 'admin@piscina.local',
      'WtIXo7Cuf+dpsbXZk3jy7Mpp7C3M5npIkQ2cDAr7Z4w=',
      'gn61Au/imua65hXgNHGoEA==', 210000, 'AMMINISTRATORE', TRUE),
-    (NULL, 'Nuoto', 'Emilia', 'club@piscina.local',
+    (NULL, (SELECT ID_Club FROM CLUB_SPORTIVO
+            WHERE Nome = 'Nuoto Emilia'),
+     'Nuoto', 'Emilia', 'club@piscina.local',
      'YEjRdihexV2bM3i7xEAooSCbJoX0ZtVDMlUE4ZPfM4M=',
      'JwD8tH93fWUSh0L5zTJjDg==', 210000, 'CLUB', TRUE),
     ((SELECT ID_Utente FROM UTENTE
-      WHERE Email = 'cliente@piscina.local'),
+      WHERE Email = 'cliente@piscina.local'), NULL,
      'Chiara', 'Cliente', 'cliente@piscina.local',
      'RPE+zAdnSs/ZKKxzehXtt+slgME99Vxkqa8MUlw3eIk=',
      'wGdohnNA44cC06F4yQi59w==', 210000, 'UTENTE', TRUE),
     ((SELECT ID_Utente FROM UTENTE
-      WHERE Email = 'atleta@piscina.local'),
+      WHERE Email = 'atleta@piscina.local'), NULL,
      'Alice', 'Atleta', 'atleta@piscina.local',
      'PmjNbf+5NUapBahRJ40e3Oxl86hc1aWjrqOOl4ZQdek=',
      'GAPxreqWrnOdXDdta1KyYQ==', 210000, 'UTENTE', TRUE),
     ((SELECT ID_Utente FROM UTENTE
-      WHERE Email = 'istruttore@piscina.local'),
+      WHERE Email = 'istruttore@piscina.local'), NULL,
      'Ivo', 'Istruttore', 'istruttore@piscina.local',
      'Ci2KFGEU0mCQn+865yHDg4bRUQlaYs+NAqpCKyOOjfk=',
      'ByawZajFziCzwe/ZARpaJg==', 210000, 'UTENTE', TRUE),
     ((SELECT ID_Utente FROM UTENTE
-      WHERE Email = 'atleta.istruttore@piscina.local'),
+      WHERE Email = 'atleta.istruttore@piscina.local'), NULL,
      'Andrea', 'Completo', 'atleta.istruttore@piscina.local',
      'IkS6gaFAe8o4zjYBm8O28LxxFCXEho8M4L8ofXpShco=',
      'X6VCOgjgHB8sl+kwlVY5kw==', 210000, 'UTENTE', TRUE)
 ON DUPLICATE KEY UPDATE
     ID_Utente = VALUES(ID_Utente),
+    ID_Club = VALUES(ID_Club),
     Nome = VALUES(Nome),
     Cognome = VALUES(Cognome),
     Password_Hash = VALUES(Password_Hash),
@@ -631,3 +776,5 @@ ON DUPLICATE KEY UPDATE
     Password_Iterazioni = VALUES(Password_Iterazioni),
     Ruolo = VALUES(Ruolo),
     Attivo = VALUES(Attivo);
+
+SET SQL_SAFE_UPDATES = @OLD_SQL_SAFE_UPDATES;

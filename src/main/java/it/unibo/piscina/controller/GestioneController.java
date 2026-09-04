@@ -3,7 +3,10 @@ package it.unibo.piscina.controller;
 import it.unibo.piscina.model.DatiTabella;
 import it.unibo.piscina.model.DefinizioneEntita;
 import it.unibo.piscina.model.OpzioneRiferimento;
+import it.unibo.piscina.model.SessioneUtente;
+import it.unibo.piscina.service.CatalogoDominio;
 import it.unibo.piscina.service.GestioneService;
+import java.time.LocalDate;
 import java.util.List;
 import java.util.Objects;
 
@@ -18,6 +21,13 @@ public final class GestioneController {
 
     public DatiTabella carica(final DefinizioneEntita definition) {
         return service.carica(definition);
+    }
+
+    public List<DefinizioneEntita> definizioniPerSezione(
+            final String section,
+            final SessioneUtente session) {
+
+        return CatalogoDominio.perSezione(section, session);
     }
 
     public List<OpzioneRiferimento> caricaOpzioni(final String sql) {
@@ -46,7 +56,15 @@ public final class GestioneController {
         service.elimina(definition, originalRow);
     }
 
-    public DatiTabella eseguiConsultazione(final String sql) {
-        return service.eseguiConsultazione(sql);
+    public List<String> nomiRiepiloghi() {
+        return service.nomiRiepiloghi();
+    }
+
+    public DatiTabella eseguiRiepilogo(
+            final int indice,
+            final LocalDate inizio,
+            final LocalDate fine) {
+
+        return service.eseguiRiepilogo(indice, inizio, fine);
     }
 }

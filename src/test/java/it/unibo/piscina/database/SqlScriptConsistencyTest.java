@@ -75,6 +75,11 @@ class SqlScriptConsistencyTest {
         assertTrue(schema.contains(
             "'AMMINISTRATORE', 'CLUB', 'UTENTE'"
         ));
+        assertTrue(schema.contains("ID_CLUB BIGINT UNSIGNED"));
+        assertTrue(schema.contains("FK_ACCOUNT_CLUB"));
+        assertTrue(schema.contains("UQ_ACCOUNT_CLUB"));
+        assertTrue(schema.contains("CK_ACCOUNT_COLLEGAMENTO"));
+        assertTrue(schema.contains("FK_ACCOUNT_UTENTE FOREIGN KEY"));
         assertFalse(schema.contains("'RECEPTIONIST'"));
         assertFalse(schema.contains("'REFERENTE_CLUB'"));
     }
@@ -130,6 +135,22 @@ class SqlScriptConsistencyTest {
                 "Account non documentato nel README: " + email
             );
         }
+        final int accountSectionStart = demo.indexOf(
+            "-- ACCOUNT TECNICI DELL'INTERFACCIA"
+        );
+        assertTrue(accountSectionStart >= 0);
+        final String accountSection = demo.substring(accountSectionStart);
+        for (String extraAccount : List.of(
+                "junior1@piscina.local",
+                "junior2@piscina.local",
+                "senior2@piscina.local",
+                "coach@piscina.local")) {
+
+            assertFalse(
+                accountSection.contains(extraAccount),
+                "Account demo non documentato: " + extraAccount
+            );
+        }
         assertTrue(
             demo.contains("DELETE FROM ACCOUNT"),
             "Il popolamento deve rimuovere il vecchio account receptionist"
@@ -140,6 +161,32 @@ class SqlScriptConsistencyTest {
         );
         assertTrue(demo.contains("'CLUB'"));
         assertFalse(demo.contains("'REFERENTE_CLUB'"));
+    }
+
+    @Test
+    void popolamentoProteggeLeAssociazioniEdEsaurisceIngressoSingolo()
+            throws IOException {
+
+        final String demo = read("02_popolamento_demo.sql").toUpperCase();
+
+        assertFalse(demo.contains("INSERT IGNORE INTO UTILIZZA"));
+        assertFalse(demo.contains("INSERT IGNORE INTO ASSEGNATO_A"));
+        assertFalse(demo.contains("INSERT IGNORE INTO SVOLGE"));
+        assertTrue(demo.contains("FROM UTILIZZA X"));
+        assertTrue(demo.contains("FROM ASSEGNATO_A X"));
+        assertTrue(demo.contains("FROM SVOLGE X"));
+        assertTrue(demo.contains("'INGRESSO SINGOLO'"));
+        assertTrue(demo.contains("NULL, 1)"));
+        assertTrue(demo.contains("@DATA_ACCESSO_DEMO"));
+        assertFalse(demo.contains(
+            "SELECT @ID_ABB, @ID_ATT, CURRENT_TIMESTAMP"
+        ));
+        assertFalse(demo.contains(
+            "TIMESTAMP(DATE_SUB(CURRENT_DATE, INTERVAL 7 DAY)"
+        ));
+        assertTrue(demo.contains(
+            "SET SQL_SAFE_UPDATES = @OLD_SQL_SAFE_UPDATES"
+        ));
     }
 
     @Test

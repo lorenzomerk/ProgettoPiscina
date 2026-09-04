@@ -180,37 +180,6 @@ public final class UtentiPanel extends JPanel {
         return footer;
     }
 
-    /*
-    private void configureActions() {
-        newButton.addActionListener(event -> {
-            final Utente input = UtenteFormDialog.show(this, null);
-            if (input != null) {
-                runMutation(() -> controller.creaUtente(input));
-            }
-        });
-        editButton.addActionListener(event -> {
-            final Utente selected = selectedUser();
-            if (selected == null) {
-                return;
-            }
-            final Utente input = UtenteFormDialog.show(this, selected);
-            if (input != null) {
-                runMutation(() -> controller.modificaUtente(input));
-            }
-        });
-        deactivateButton.addActionListener(event -> deactivateSelected());
-        refreshButton.addActionListener(event -> reloadData());
-        table.addMouseListener(new java.awt.event.MouseAdapter() {
-            @Override
-            public void mouseClicked(final java.awt.event.MouseEvent event) {
-                if (event.getClickCount() == 2) {
-                    editButton.doClick();
-                }
-            }
-        });
-    }
-    */
-
     private void configureActions() {
         newButton.addActionListener(event -> createWithRetry(null));
 

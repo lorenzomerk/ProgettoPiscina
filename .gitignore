@@ -4,10 +4,11 @@ build/
 *.class
 *.jar
 *.war
+!lib/mysql-connector-j-9.7.0.jar
+!lib/junit-platform-console-standalone-1.11.3.jar
 
 # IDE
 .idea/
-.vscode/
 *.iml
 out/
 
@@ -20,11 +21,6 @@ Thumbs.db
 
 # Gradle
 .gradle/
-
-# Maven
-target/
-pom.xml.tag
-pom.xml.releaseBackup
 
 # Others
 *.swp

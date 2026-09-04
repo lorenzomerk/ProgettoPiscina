@@ -1,6 +1,7 @@
-package it.unibo.piscina.view.gestione;
+package it.unibo.piscina.service;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import it.unibo.piscina.model.RuoloApplicativo;
@@ -9,7 +10,7 @@ import java.util.Set;
 import java.util.stream.Stream;
 import org.junit.jupiter.api.Test;
 
-class DefinizioniDominioTest {
+class CatalogoDominioTest {
 
     @Test
     void amministratoreTrovaTuttiIModuliConcettuali() {
@@ -20,19 +21,19 @@ class DefinizioniDominioTest {
 
         assertEquals(
             3,
-            DefinizioniDominio.perSezione("Abbonamenti", admin).size()
+            CatalogoDominio.perSezione("Abbonamenti", admin).size()
         );
         assertEquals(
             4,
-            DefinizioniDominio.perSezione("Attività", admin).size()
+            CatalogoDominio.perSezione("Attività", admin).size()
         );
         assertEquals(
             3,
-            DefinizioniDominio.perSezione("Struttura", admin).size()
+            CatalogoDominio.perSezione("Struttura", admin).size()
         );
         assertEquals(
             5,
-            DefinizioniDominio.perSezione(
+            CatalogoDominio.perSezione(
                 "Club e squadre",
                 admin
             ).size()
@@ -45,15 +46,15 @@ class DefinizioniDominioTest {
             RuoloApplicativo.UTENTE,
             42L
         );
-        final var subscriptions = DefinizioniDominio.perSezione(
+        final var subscriptions = CatalogoDominio.perSezione(
             "Abbonamenti",
             user
         ).getFirst();
-        final var registrations = DefinizioniDominio.perSezione(
+        final var registrations = CatalogoDominio.perSezione(
             "Attività",
             user
         ).get(1);
-        final var accesses = DefinizioniDominio.perSezione(
+        final var accesses = CatalogoDominio.perSezione(
             "Accessi",
             user
         ).getFirst();
@@ -63,7 +64,50 @@ class DefinizioniDominioTest {
         ));
         assertTrue(subscriptions.inseribile());
         assertTrue(registrations.inseribile());
+        assertFalse(registrations.eliminabile());
         assertTrue(accesses.inseribile());
+    }
+
+    @Test
+    void vistaClubUsaIdentificativoENonEsponeIscrizioniIndividuali() {
+        final SessioneUtente club = new SessioneUtente(
+            3L,
+            null,
+            17L,
+            "Nuoto",
+            "Emilia",
+            "email-modificabile@example.com",
+            RuoloApplicativo.CLUB,
+            Set.of()
+        );
+
+        final var activities = CatalogoDominio.perSezione(
+            "Attività",
+            club
+        );
+        assertEquals(2, activities.size());
+        assertTrue(activities.get(1).querySelezione().contains(
+            "s.ID_Club = 17"
+        ));
+        assertTrue(activities.stream().noneMatch(definition ->
+            definition.tabella().equals("ISCRIZIONE_ATTIVITA")
+        ));
+        assertTrue(activities.stream().allMatch(definition ->
+            !definition.inseribile()
+                && !definition.modificabile()
+                && !definition.eliminabile()
+        ));
+
+        final var clubData = CatalogoDominio.perSezione(
+            "Club e squadre",
+            club
+        );
+        assertTrue(clubData.stream().allMatch(definition ->
+            definition.querySelezione().contains("ID_Club = 17")
+        ));
+        assertTrue(clubData.stream().noneMatch(definition ->
+            definition.querySelezione().contains(club.email())
+        ));
     }
 
     @Test
@@ -79,7 +123,7 @@ class DefinizioniDominioTest {
             "Struttura",
             "Club e squadre"
         ).flatMap(section ->
-            DefinizioniDominio.perSezione(section, admin).stream()
+            CatalogoDominio.perSezione(section, admin).stream()
         ).forEach(definition -> assertEquals(
             definition.campi().size(),
             selectColumnCount(definition.querySelezione()),
@@ -94,6 +138,7 @@ class DefinizioniDominioTest {
         return new SessioneUtente(
             1L,
             userId,
+            null,
             "Nome",
             "Cognome",
             "utente@example.com",

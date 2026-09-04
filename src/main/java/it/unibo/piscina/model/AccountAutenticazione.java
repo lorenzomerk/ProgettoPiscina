@@ -6,6 +6,7 @@ import java.util.Set;
 public record AccountAutenticazione(
     Long id,
     Long utenteId,
+    Long clubId,
     String nome,
     String cognome,
     String email,

@@ -2,16 +2,18 @@ package it.unibo.piscina.service;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
-import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import it.unibo.piscina.dao.AccountDAO;
+import it.unibo.piscina.dao.RegistrazioneDAO;
 import it.unibo.piscina.model.AccountAutenticazione;
 import it.unibo.piscina.model.QualificaUtente;
 import it.unibo.piscina.model.RuoloApplicativo;
 import it.unibo.piscina.model.SessioneUtente;
 import it.unibo.piscina.service.security.PasswordHasher;
+import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
@@ -29,7 +31,7 @@ class AuthServiceTest {
     void setUp() {
         dao = new InMemoryAccountDAO();
         hasher = new PasswordHasher();
-        service = new AuthService(dao, hasher);
+        service = new AuthService(dao, dao, hasher);
     }
 
     @Test
@@ -37,18 +39,81 @@ class AuthServiceTest {
         final SessioneUtente session = service.registra(
             " Mario ",
             " Rossi ",
+            " rssmra90a01h501u ",
+            "1990-01-01",
             " MARIO@EXAMPLE.COM ",
             "Cliente123!".toCharArray(),
             "Cliente123!".toCharArray()
         );
 
         assertEquals(RuoloApplicativo.UTENTE, session.ruolo());
-        assertNull(session.utenteId());
+        assertNotNull(session.utenteId());
+        assertEquals(1L, session.utenteId());
         assertTrue(session.qualifiche().isEmpty());
         assertEquals("mario@example.com", session.email());
         final AccountAutenticazione saved = dao.accounts.getFirst();
+        assertEquals(session.utenteId(), saved.utenteId());
         assertNotEquals("Cliente123!", saved.passwordHash());
         assertTrue(saved.passwordIterazioni() >= 100_000);
+    }
+
+    @Test
+    void accessoRifiutaUnAccountDisattivato() {
+        final AccountAutenticazione active = account(
+            4L,
+            "inactive@example.com",
+            "Cliente123!",
+            RuoloApplicativo.UTENTE
+        );
+        dao.accounts.add(new AccountAutenticazione(
+            active.id(),
+            active.utenteId(),
+            active.clubId(),
+            active.nome(),
+            active.cognome(),
+            active.email(),
+            active.passwordHash(),
+            active.passwordSalt(),
+            active.passwordIterazioni(),
+            active.ruolo(),
+            active.qualifiche(),
+            false
+        ));
+
+        assertThrows(
+            AutenticazioneException.class,
+            () -> service.accedi(
+                "inactive@example.com",
+                "Cliente123!".toCharArray()
+            )
+        );
+    }
+
+    @Test
+    void accessoClubPropagaIlCollegamentoStabile() {
+        final var protectedPassword =
+            hasher.hash("Club123!".toCharArray());
+        dao.accounts.add(new AccountAutenticazione(
+            8L,
+            null,
+            77L,
+            "Nuoto",
+            "Emilia",
+            "club@example.com",
+            protectedPassword.hash(),
+            protectedPassword.salt(),
+            protectedPassword.iterations(),
+            RuoloApplicativo.CLUB,
+            Set.of(),
+            true
+        ));
+
+        final SessioneUtente session = service.accedi(
+            "club@example.com",
+            "Club123!".toCharArray()
+        );
+
+        assertEquals(77L, session.clubId());
     }
 
     @Test
@@ -95,6 +160,7 @@ class AuthServiceTest {
         dao.accounts.add(new AccountAutenticazione(
             12L,
             44L,
+            null,
             "Andrea",
             "Completo",
             "andrea@example.com",
@@ -121,7 +187,8 @@ class AuthServiceTest {
         assertThrows(
             AutenticazioneException.class,
             () -> service.registra(
-                "Mario", "Rossi", "mario@example.com",
+                "Mario", "Rossi", "RSSMRA90A01H501U",
+                "1990-01-01", "mario@example.com",
                 "debole".toCharArray(),
                 "debole".toCharArray()
             )
@@ -129,7 +196,8 @@ class AuthServiceTest {
         assertThrows(
             AutenticazioneException.class,
             () -> service.registra(
-                "Mario", "Rossi", "mario@example.com",
+                "Mario", "Rossi", "RSSMRA90A01H501U",
+                "1990-01-01", "mario@example.com",
                 "Cliente123!".toCharArray(),
                 "Diversa123!".toCharArray()
             )
@@ -146,6 +214,7 @@ class AuthServiceTest {
             hasher.hash(password.toCharArray());
         return new AccountAutenticazione(
             id,
+            role == RuoloApplicativo.UTENTE ? id + 100 : null,
             null,
             "Nome",
             "Cognome",
@@ -159,7 +228,8 @@ class AuthServiceTest {
         );
     }
 
-    private static final class InMemoryAccountDAO implements AccountDAO {
+    private static final class InMemoryAccountDAO
+            implements AccountDAO, RegistrazioneDAO {
 
         private final List<AccountAutenticazione> accounts =
             new ArrayList<>();
@@ -176,11 +246,17 @@ class AuthServiceTest {
         }
 
         @Override
-        public long insert(final AccountAutenticazione account) {
-            final long id = nextId++;
+        public RegistrazioneCreata insert(
+                final String codiceFiscale,
+                final LocalDate dataNascita,
+                final AccountAutenticazione account) {
+
+            final long utenteId = nextId++;
+            final long accountId = nextId++;
             accounts.add(new AccountAutenticazione(
-                id,
-                account.utenteId(),
+                accountId,
+                utenteId,
+                null,
                 account.nome(),
                 account.cognome(),
                 account.email(),
@@ -191,7 +267,7 @@ class AuthServiceTest {
                 account.qualifiche(),
                 account.attivo()
             ));
-            return id;
+            return new RegistrazioneCreata(accountId, utenteId);
         }
 
         @Override

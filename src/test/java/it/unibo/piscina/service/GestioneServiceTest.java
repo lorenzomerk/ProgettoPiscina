@@ -2,6 +2,7 @@ package it.unibo.piscina.service;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import it.unibo.piscina.dao.GestioneDAO;
 import it.unibo.piscina.model.CampoEntita;
@@ -9,6 +10,7 @@ import it.unibo.piscina.model.DatiTabella;
 import it.unibo.piscina.model.DefinizioneEntita;
 import it.unibo.piscina.model.OpzioneRiferimento;
 import it.unibo.piscina.model.TipoCampo;
+import java.time.LocalDate;
 import java.util.List;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -88,6 +90,27 @@ class GestioneServiceTest {
         );
     }
 
+    @Test
+    void esegueIlRiepilogoSenzaEsporreSqlAllaView() {
+        service.eseguiRiepilogo(
+            3,
+            LocalDate.of(2026, 1, 1),
+            LocalDate.of(2026, 12, 31)
+        );
+
+        assertEquals(6, service.nomiRiepiloghi().size());
+        assertTrue(dao.lastSql.contains("DATE '2026-12-31'"));
+        assertTrue(dao.lastSql.contains("DATE '2026-01-01'"));
+        assertThrows(
+            IllegalArgumentException.class,
+            () -> service.eseguiRiepilogo(
+                0,
+                LocalDate.of(2026, 12, 31),
+                LocalDate.of(2026, 1, 1)
+            )
+        );
+    }
+
     private static final class RecordingDAO implements GestioneDAO {
 
         private String lastSql;
@@ -95,6 +118,7 @@ class GestioneServiceTest {
 
         @Override
         public DatiTabella query(final String sql) {
+            lastSql = sql;
             return new DatiTabella(List.of(), List.of());
         }
 

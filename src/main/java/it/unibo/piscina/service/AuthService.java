@@ -1,11 +1,14 @@
 package it.unibo.piscina.service;
 
 import it.unibo.piscina.dao.AccountDAO;
+import it.unibo.piscina.dao.RegistrazioneDAO;
 import it.unibo.piscina.model.AccountAutenticazione;
 import it.unibo.piscina.model.RuoloApplicativo;
 import it.unibo.piscina.model.SessioneUtente;
 import it.unibo.piscina.service.security.PasswordHasher;
 import it.unibo.piscina.service.security.PasswordHasher.PasswordHash;
+import java.time.LocalDate;
+import java.time.format.DateTimeParseException;
 import java.util.Locale;
 import java.util.Objects;
 import java.util.Set;
@@ -17,15 +20,21 @@ public final class AuthService {
     private static final Pattern EMAIL = Pattern.compile(
         "^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$"
     );
+    private static final Pattern CODICE_FISCALE = Pattern.compile(
+        "^[A-Z0-9]{16}$"
+    );
 
     private final AccountDAO accountDAO;
+    private final RegistrazioneDAO registrazioneDAO;
     private final PasswordHasher passwordHasher;
 
     public AuthService(
             final AccountDAO accountDAO,
+            final RegistrazioneDAO registrazioneDAO,
             final PasswordHasher passwordHasher) {
 
         this.accountDAO = Objects.requireNonNull(accountDAO);
+        this.registrazioneDAO = Objects.requireNonNull(registrazioneDAO);
         this.passwordHasher = Objects.requireNonNull(passwordHasher);
     }
 
@@ -63,12 +72,16 @@ public final class AuthService {
     public SessioneUtente registra(
             final String rawName,
             final String rawSurname,
+            final String rawFiscalCode,
+            final String rawBirthDate,
             final String rawEmail,
             final char[] password,
             final char[] confirmation) {
 
         final String name = required(rawName, "Nome", 80);
         final String surname = required(rawSurname, "Cognome", 80);
+        final String fiscalCode = normalizeFiscalCode(rawFiscalCode);
+        final LocalDate birthDate = parseBirthDate(rawBirthDate);
         final String email = normalizeEmail(rawEmail);
         validatePassword(password, confirmation);
 
@@ -78,6 +91,7 @@ public final class AuthService {
 
         final PasswordHash protectedPassword = passwordHasher.hash(password);
         final AccountAutenticazione account = new AccountAutenticazione(
+            null,
             null,
             null,
             name,
@@ -90,9 +104,11 @@ public final class AuthService {
             Set.of(),
             true
         );
-        final long id = accountDAO.insert(account);
+        final RegistrazioneDAO.RegistrazioneCreata registration =
+            registrazioneDAO.insert(fiscalCode, birthDate, account);
         return new SessioneUtente(
-            id,
+            registration.accountId(),
+            registration.utenteId(),
             null,
             name,
             surname,
@@ -100,6 +116,38 @@ public final class AuthService {
             RuoloApplicativo.UTENTE,
             Set.of()
         );
+    }
+
+    private String normalizeFiscalCode(final String value) {
+        final String fiscalCode = required(value, "Codice fiscale", 16)
+            .toUpperCase(Locale.ROOT);
+        if (!CODICE_FISCALE.matcher(fiscalCode).matches()) {
+            throw new AutenticazioneException(
+                "Il codice fiscale deve contenere 16 lettere o cifre"
+            );
+        }
+        return fiscalCode;
+    }
+
+    private LocalDate parseBirthDate(final String value) {
+        final String normalized = required(
+            value,
+            "Data di nascita",
+            10
+        );
+        try {
+            final LocalDate birthDate = LocalDate.parse(normalized);
+            if (birthDate.isAfter(LocalDate.now())) {
+                throw new AutenticazioneException(
+                    "La data di nascita non può essere futura"
+                );
+            }
+            return birthDate;
+        } catch (DateTimeParseException exception) {
+            throw new AutenticazioneException(
+                "Data di nascita non valida: usa il formato AAAA-MM-GG"
+            );
+        }
     }
 
     private void validatePassword(
@@ -168,6 +216,7 @@ public final class AuthService {
         return new SessioneUtente(
             account.id(),
             account.utenteId(),
+            account.clubId(),
             account.nome(),
             account.cognome(),
             account.email(),

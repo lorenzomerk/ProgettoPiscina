@@ -8,7 +8,5 @@ public interface AccountDAO {
 
     Optional<AccountAutenticazione> findByEmail(String email);
 
-    long insert(AccountAutenticazione account);
-
     void recordSuccessfulAccess(long accountId);
 }

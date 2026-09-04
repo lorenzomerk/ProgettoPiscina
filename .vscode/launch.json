@@ -1,0 +1,38 @@
+{
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "type": "java",
+            "name": "Avvia Gestione Piscina",
+            "request": "launch",
+            "mainClass": "it.unibo.piscina.App",
+            "cwd": "${workspaceFolder}",
+            "console": "integratedTerminal",
+            "preLaunchTask": "Compila Gestione Piscina",
+            "env": {
+                "PISCINA_DB_URL": "jdbc:mysql://127.0.0.1:3306/piscina_progetto?serverTimezone=Europe/Rome&characterEncoding=UTF-8",
+                "PISCINA_DB_USER": "piscina_app",
+                "PISCINA_DB_PASSWORD": "Piscina!"
+            },
+            "classPaths": [
+                "${workspaceFolder}/bin",
+                "${workspaceFolder}/src/main/resources",
+                "${workspaceFolder}/lib/*"
+            ]
+        },
+        {
+            "type": "java",
+            "name": "Esegui test",
+            "request": "launch",
+            "mainClass": "org.junit.platform.console.ConsoleLauncher",
+            "args": "execute --scan-class-path --disable-banner --details summary",
+            "cwd": "${workspaceFolder}",
+            "console": "integratedTerminal",
+            "preLaunchTask": "Compila Gestione Piscina",
+            "classPaths": [
+                "${workspaceFolder}/bin",
+                "${workspaceFolder}/lib/*"
+            ]
+        }
+    ]
+}

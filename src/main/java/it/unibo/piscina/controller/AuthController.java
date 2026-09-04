@@ -23,6 +23,8 @@ public final class AuthController {
     public SessioneUtente registra(
             final String nome,
             final String cognome,
+            final String codiceFiscale,
+            final String dataNascita,
             final String email,
             final char[] password,
             final char[] conferma) {
@@ -30,6 +32,8 @@ public final class AuthController {
         return authService.registra(
             nome,
             cognome,
+            codiceFiscale,
+            dataNascita,
             email,
             password,
             conferma
