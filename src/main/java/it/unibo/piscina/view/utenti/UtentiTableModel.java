@@ -13,7 +13,7 @@ final class UtentiTableModel extends AbstractTableModel {
     private static final String[] COLUMNS = {
         "ID", "Codice fiscale", "Cognome", "Nome", "Data nascita",
         "Registrazione", "Email", "Telefono", "Certificato medico",
-        "Ruoli", "Stato"
+        "Ruoli"
     };
 
     private List<Utente> utenti = new ArrayList<>();
@@ -56,7 +56,6 @@ final class UtentiTableModel extends AbstractTableModel {
             case 7 -> utente.telefono();
             case 8 -> certificateStatus(utente);
             case 9 -> roles(utente);
-            case 10 -> utente.attivo() ? "Attivo" : "Disattivato";
             default -> "";
         };
     }

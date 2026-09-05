@@ -21,9 +21,7 @@ public final class JdbcAccountDAO implements AccountDAO {
                A.Nome, A.Cognome, A.Email,
                A.Password_Hash, A.Password_Salt, A.Password_Iterazioni,
                A.Ruolo,
-               (A.Attivo AND (
-                   A.Ruolo <> 'UTENTE' OR COALESCE(U.Attivo, FALSE)
-               )) AS Attivo,
+               A.Attivo,
                EXISTS (
                    SELECT 1
                    FROM ATLETA AT
@@ -35,7 +33,6 @@ public final class JdbcAccountDAO implements AccountDAO {
                    WHERE I.ID_Utente = A.ID_Utente
                ) AS Qualifica_Istruttore
         FROM ACCOUNT A
-        LEFT JOIN UTENTE U ON U.ID_Utente = A.ID_Utente
         WHERE A.Email = ?
         """;
 

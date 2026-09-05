@@ -1,7 +1,6 @@
 package it.unibo.piscina.view.utenti;
 
 import static it.unibo.piscina.view.theme.PoolTheme.BODY_FONT;
-import static it.unibo.piscina.view.theme.PoolTheme.DANGER;
 import static it.unibo.piscina.view.theme.PoolTheme.MUTED_TEXT;
 import static it.unibo.piscina.view.theme.PoolTheme.PAGE_BACKGROUND;
 import static it.unibo.piscina.view.theme.PoolTheme.SURFACE;
@@ -40,7 +39,6 @@ public final class UtentiPanel extends JPanel {
     private final JLabel statusLabel = new JLabel(" ");
     private final JButton newButton = new JButton("Nuovo utente");
     private final JButton editButton = new JButton("Modifica");
-    private final JButton deactivateButton = new JButton("Disattiva");
     private final JTextField searchField = new JTextField(15);
     private final JButton searchButton = new JButton("Cerca/aggiorna");
 
@@ -121,11 +119,9 @@ public final class UtentiPanel extends JPanel {
 
         PoolTheme.stylePrimaryButton(newButton);
         styleSecondaryButton(editButton);
-        styleDangerButton(deactivateButton);
 
         toolbar.add(newButton);
         toolbar.add(editButton);
-        toolbar.add(deactivateButton);
 
         styleSecondaryButton(searchButton);
         final JLabel searchLabel = new JLabel("   Cerca:");
@@ -190,8 +186,6 @@ public final class UtentiPanel extends JPanel {
             }
         });
 
-        deactivateButton.addActionListener(event -> deactivateSelected());
-
         table.addMouseListener(new java.awt.event.MouseAdapter() {
             @Override
             public void mouseClicked(final java.awt.event.MouseEvent event) {
@@ -203,35 +197,6 @@ public final class UtentiPanel extends JPanel {
 
         searchButton.addActionListener(event -> reloadData());
         searchField.addActionListener(event -> reloadData());
-    }
-
-    private void deactivateSelected() {
-        final Utente selected = selectedUser();
-        if (selected == null) {
-            return;
-        }
-        if (!selected.attivo()) {
-            JOptionPane.showMessageDialog(
-                this,
-                "L'utente è già disattivato.",
-                "Gestione utenti",
-                JOptionPane.INFORMATION_MESSAGE
-            );
-            return;
-        }
-
-        final int answer = JOptionPane.showConfirmDialog(
-            this,
-            "Disattivare " + selected.nome() + " "
-                + selected.cognome() + "?\n"
-                + "Lo storico resterà disponibile.",
-            "Conferma disattivazione",
-            JOptionPane.YES_NO_OPTION,
-            JOptionPane.WARNING_MESSAGE
-        );
-        if (answer == JOptionPane.YES_OPTION) {
-            runMutation(() -> controller.disattivaUtente(selected.id()), null);
-        }
     }
 
     private Utente selectedUser() {
@@ -299,7 +264,6 @@ public final class UtentiPanel extends JPanel {
     private void setBusy(final boolean busy, final String message) {
         newButton.setEnabled(!busy);
         editButton.setEnabled(!busy);
-        deactivateButton.setEnabled(!busy);
         table.setEnabled(!busy);
         if (message != null) {
             statusLabel.setText(message);
@@ -317,11 +281,6 @@ public final class UtentiPanel extends JPanel {
                 BorderFactory.createEmptyBorder(8, 14, 8, 14)
             )
         );
-    }
-
-    private void styleDangerButton(final JButton button) {
-        styleSecondaryButton(button);
-        button.setForeground(DANGER);
     }
 
     private void showError(final String message) {

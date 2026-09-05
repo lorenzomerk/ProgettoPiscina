@@ -31,10 +31,8 @@ final class UtenteFormDialog {
         final JCheckBox athlete = new JCheckBox("Atleta");
         final JCheckBox instructor = new JCheckBox("Istruttore");
         final JTextField qualification = new JTextField(22);
-        final JCheckBox active = new JCheckBox("Utente attivo", true);
         athlete.setOpaque(false);
         instructor.setOpaque(false);
-        active.setOpaque(false);
         qualification.setEnabled(false);
         instructor.addActionListener(event ->
             qualification.setEnabled(instructor.isSelected()));
@@ -50,8 +48,7 @@ final class UtenteFormDialog {
             certificate,
             athlete,
             instructor,
-            qualification,
-            active
+            qualification
         );
         final JPanel form = createForm(
             existing,
@@ -64,8 +61,7 @@ final class UtenteFormDialog {
             certificate,
             athlete,
             instructor,
-            qualification,
-            active
+            qualification
         );
 
         while (true) {
@@ -92,7 +88,6 @@ final class UtenteFormDialog {
                         certificate.getText(),
                         "scadenza del certificato"
                     ),
-                    existing == null || active.isSelected(),
                     athlete.isSelected(),
                     instructor.isSelected(),
                     qualification.getText(),
@@ -122,8 +117,7 @@ final class UtenteFormDialog {
             final JTextField certificate,
             final JCheckBox athlete,
             final JCheckBox instructor,
-            final JTextField qualification,
-            final JCheckBox active) {
+            final JTextField qualification) {
 
         if (existing == null) {
             return;
@@ -145,7 +139,6 @@ final class UtenteFormDialog {
             nullToEmpty(existing.qualificaIstruttore())
         );
         qualification.setEnabled(existing.istruttore());
-        active.setSelected(existing.attivo());
     }
 
     private static JPanel createForm(
@@ -159,8 +152,7 @@ final class UtenteFormDialog {
             final JTextField certificate,
             final JCheckBox athlete,
             final JCheckBox instructor,
-            final JTextField qualification,
-            final JCheckBox active) {
+            final JTextField qualification) {
 
         final JPanel form = new JPanel(new GridBagLayout());
         form.setBorder(BorderFactory.createEmptyBorder(8, 8, 8, 8));
@@ -183,9 +175,6 @@ final class UtenteFormDialog {
         roles.add(instructor);
         addRow(form, row++, "Ruoli di dominio", roles);
         addRow(form, row++, "Qualifica istruttore", qualification);
-        if (existing != null) {
-            addRow(form, row, "Stato", active);
-        }
         return form;
     }
 

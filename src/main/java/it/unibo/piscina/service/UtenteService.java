@@ -41,17 +41,6 @@ public final class UtenteService {
         }
     }
 
-    public void disattivaUtente(final long id) {
-        if (id <= 0) {
-            throw new IllegalArgumentException("Identificativo non valido");
-        }
-        if (!utenteDAO.deactivate(id)) {
-            throw new IllegalArgumentException(
-                "L'utente da disattivare non esiste più"
-            );
-        }
-    }
-
     private Utente normalizeAndValidate(
             final Utente input,
             final boolean requireId) {
@@ -122,7 +111,6 @@ public final class UtenteService {
             email.isEmpty() ? null : email,
             nullable(input.telefono()),
             input.scadenzaCertificatoMedico(),
-            input.attivo(),
             input.atleta(),
             input.istruttore(),
             input.istruttore() ? instructorQualification : null,

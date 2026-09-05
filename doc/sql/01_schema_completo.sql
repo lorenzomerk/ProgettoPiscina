@@ -19,7 +19,6 @@ CREATE TABLE IF NOT EXISTS UTENTE (
     Scadenza_Certificato_Medico DATE,
     Email VARCHAR(255),
     Telefono VARCHAR(30),
-    Attivo BOOLEAN NOT NULL DEFAULT TRUE,
     Creato_Il TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     Aggiornato_Il TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
         ON UPDATE CURRENT_TIMESTAMP,
@@ -36,6 +35,23 @@ CREATE TABLE IF NOT EXISTS UTENTE (
         Scadenza_Certificato_Medico
     )
 );
+
+-- Allinea anche le installazioni precedenti, nelle quali UTENTE aveva uno
+-- stato applicativo ora demandato esclusivamente ad ACCOUNT.Attivo.
+SET @drop_utente_attivo = IF(
+    EXISTS (
+        SELECT 1
+        FROM information_schema.COLUMNS
+        WHERE TABLE_SCHEMA = DATABASE()
+          AND TABLE_NAME = 'UTENTE'
+          AND COLUMN_NAME = 'Attivo'
+    ),
+    'ALTER TABLE UTENTE DROP COLUMN Attivo',
+    'SELECT 1'
+);
+PREPARE drop_utente_attivo FROM @drop_utente_attivo;
+EXECUTE drop_utente_attivo;
+DEALLOCATE PREPARE drop_utente_attivo;
 
 -- Specializzazione parziale e sovrapposta di UTENTE.
 CREATE TABLE IF NOT EXISTS ATLETA (

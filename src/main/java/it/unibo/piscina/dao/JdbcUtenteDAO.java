@@ -19,7 +19,7 @@ public final class JdbcUtenteDAO implements UtenteDAO {
     private static final String SELECT_ALL = """
         SELECT ID_Utente, Codice_Fiscale, Nome, Cognome,
                Data_Nascita, Data_Registrazione, Email, Telefono,
-               Scadenza_Certificato_Medico, Attivo,
+               Scadenza_Certificato_Medico,
                EXISTS (
                    SELECT 1 FROM ATLETA a
                    WHERE a.ID_Utente = u.ID_Utente
@@ -39,26 +39,22 @@ public final class JdbcUtenteDAO implements UtenteDAO {
     private static final String INSERT = """
         INSERT INTO UTENTE
             (Codice_Fiscale, Nome, Cognome, Data_Nascita,
-             Email, Telefono, Scadenza_Certificato_Medico, Attivo)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+             Email, Telefono, Scadenza_Certificato_Medico)
+        VALUES (?, ?, ?, ?, ?, ?, ?)
         """;
 
     private static final String UPDATE = """
         UPDATE UTENTE
         SET Codice_Fiscale = ?, Nome = ?, Cognome = ?,
             Data_Nascita = ?, Email = ?, Telefono = ?,
-            Scadenza_Certificato_Medico = ?, Attivo = ?
+            Scadenza_Certificato_Medico = ?
         WHERE ID_Utente = ?
         """;
 
-    private static final String DEACTIVATE = """
-        UPDATE UTENTE SET Attivo = FALSE WHERE ID_Utente = ?
-        """;
-
-        private static final String SEARCH_USER = """
+    private static final String SEARCH_USER = """
         SELECT ID_Utente, Codice_Fiscale, Nome, Cognome,
                Data_Nascita, Data_Registrazione, Email, Telefono,
-               Scadenza_Certificato_Medico, Attivo,
+               Scadenza_Certificato_Medico,
                EXISTS (
                    SELECT 1 FROM ATLETA a
                    WHERE a.ID_Utente = u.ID_Utente
@@ -142,7 +138,7 @@ public final class JdbcUtenteDAO implements UtenteDAO {
                     connection.prepareStatement(UPDATE)) {
 
                 bindFields(statement, utente);
-                statement.setLong(9, utente.id());
+                statement.setLong(8, utente.id());
                 final boolean updated = statement.executeUpdate() == 1;
                 if (updated) {
                     syncQualifications(connection, utente.id(), utente);
@@ -155,19 +151,6 @@ public final class JdbcUtenteDAO implements UtenteDAO {
             }
         } catch (SQLException exception) {
             throw databaseError("modificare l'utente", exception);
-        }
-    }
-
-    @Override
-    public boolean deactivate(final long id) {
-        try (Connection connection = connectionFactory.openConnection();
-                PreparedStatement statement =
-                    connection.prepareStatement(DEACTIVATE)) {
-
-            statement.setLong(1, id);
-            return statement.executeUpdate() == 1;
-        } catch (SQLException exception) {
-            throw databaseError("disattivare l'utente", exception);
         }
     }
 
@@ -187,7 +170,6 @@ public final class JdbcUtenteDAO implements UtenteDAO {
                 ? null
                 : Date.valueOf(utente.scadenzaCertificatoMedico())
         );
-        statement.setBoolean(8, utente.attivo());
     }
 
     private Utente mapUtente(final ResultSet resultSet)
@@ -207,8 +189,6 @@ public final class JdbcUtenteDAO implements UtenteDAO {
             certificateDate == null
                 ? null
                 : certificateDate.toLocalDate(),
-            resultSet.getBoolean("Attivo")
-            ,
             resultSet.getBoolean("Atleta"),
             resultSet.getBoolean("Istruttore"),
             resultSet.getString("Qualifica_Istruttore"),

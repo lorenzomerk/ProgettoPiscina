@@ -17,8 +17,8 @@ public final class JdbcRegistrazioneDAO implements RegistrazioneDAO {
 
     private static final String INSERT_UTENTE = """
         INSERT INTO UTENTE
-            (Codice_Fiscale, Nome, Cognome, Data_Nascita, Email, Attivo)
-        VALUES (?, ?, ?, ?, ?, TRUE)
+            (Codice_Fiscale, Nome, Cognome, Data_Nascita, Email)
+        VALUES (?, ?, ?, ?, ?)
         """;
 
     private static final String INSERT_ACCOUNT = """

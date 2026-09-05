@@ -1,7 +1,6 @@
 package it.unibo.piscina.service;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -34,8 +33,7 @@ class UtenteServiceTest {
             LocalDate.of(1990, 1, 1),
             " MARIO.ROSSI@EXAMPLE.COM ",
             " 3331234567 ",
-            null,
-            true
+            null
         ));
 
         assertEquals(1L, id);
@@ -67,8 +65,7 @@ class UtenteServiceTest {
             LocalDate.now().plusDays(1),
             null,
             null,
-            null,
-            true
+            null
         );
 
         assertThrows(
@@ -88,8 +85,7 @@ class UtenteServiceTest {
             LocalDate.of(1990, 1, 1),
             "maria@example.com",
             null,
-            LocalDate.of(2027, 6, 30),
-            true
+            LocalDate.of(2027, 6, 30)
         );
 
         service.modificaUtente(modified);
@@ -99,16 +95,6 @@ class UtenteServiceTest {
             LocalDate.of(2027, 6, 30),
             dao.utenti.getFirst().scadenzaCertificatoMedico()
         );
-    }
-
-    @Test
-    void disattivazionePreservaAnagrafica() {
-        dao.utenti.add(validUser(4L, "RSSMRA90A01H501U"));
-
-        service.disattivaUtente(4L);
-
-        assertEquals(1, dao.utenti.size());
-        assertFalse(dao.utenti.getFirst().attivo());
     }
 
     @Test
@@ -122,7 +108,6 @@ class UtenteServiceTest {
             "andrea@example.com",
             null,
             null,
-            true,
             true,
             true,
             " Allenatore e istruttore "
@@ -150,7 +135,6 @@ class UtenteServiceTest {
             null,
             null,
             null,
-            true,
             false,
             true,
             " "
@@ -171,8 +155,7 @@ class UtenteServiceTest {
             LocalDate.of(1990, 1, 1),
             "mario@example.com",
             null,
-            null,
-            true
+            null
         );
     }
 
@@ -216,32 +199,6 @@ class UtenteServiceTest {
             return false;
         }
 
-        @Override
-        public boolean deactivate(final long id) {
-            for (int index = 0; index < utenti.size(); index++) {
-                final Utente current = utenti.get(index);
-                if (current.id() == id) {
-                    utenti.set(index, new Utente(
-                        current.id(),
-                        current.codiceFiscale(),
-                        current.nome(),
-                        current.cognome(),
-                        current.dataNascita(),
-                        current.email(),
-                        current.telefono(),
-                        current.scadenzaCertificatoMedico(),
-                        false,
-                        current.atleta(),
-                        current.istruttore(),
-                        current.qualificaIstruttore(),
-                        current.dataRegistrazione()
-                    ));
-                    return true;
-                }
-            }
-            return false;
-        }
-
         private Utente copyWithId(final Utente source, final long id) {
             return new Utente(
                 id,
@@ -252,7 +209,6 @@ class UtenteServiceTest {
                 source.email(),
                 source.telefono(),
                 source.scadenzaCertificatoMedico(),
-                source.attivo(),
                 source.atleta(),
                 source.istruttore(),
                 source.qualificaIstruttore(),

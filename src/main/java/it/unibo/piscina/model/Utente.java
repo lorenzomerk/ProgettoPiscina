@@ -12,7 +12,6 @@ public record Utente(
     String email,
     String telefono,
     LocalDate scadenzaCertificatoMedico,
-    boolean attivo,
     boolean atleta,
     boolean istruttore,
     String qualificaIstruttore,
@@ -27,8 +26,7 @@ public record Utente(
             final LocalDate dataNascita,
             final String email,
             final String telefono,
-            final LocalDate scadenzaCertificatoMedico,
-            final boolean attivo) {
+            final LocalDate scadenzaCertificatoMedico) {
 
         this(
             id,
@@ -39,7 +37,6 @@ public record Utente(
             email,
             telefono,
             scadenzaCertificatoMedico,
-            attivo,
             false,
             false,
             null,
@@ -57,7 +54,6 @@ public record Utente(
             final String email,
             final String telefono,
             final LocalDate scadenzaCertificatoMedico,
-            final boolean attivo,
             final boolean atleta,
             final boolean istruttore,
             final String qualificaIstruttore) {
@@ -71,7 +67,6 @@ public record Utente(
             email,
             telefono,
             scadenzaCertificatoMedico,
-            attivo,
             atleta,
             istruttore,
             qualificaIstruttore,
