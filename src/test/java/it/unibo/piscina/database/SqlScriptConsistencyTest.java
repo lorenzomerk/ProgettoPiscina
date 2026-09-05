@@ -219,15 +219,20 @@ class SqlScriptConsistencyTest {
     }
 
     @Test
-    void readmeDistingueInstallazioneEMigrazione() throws IOException {
+    void readmePrincipaleDistingueInstallazioneEMigrazione()
+            throws IOException {
+
         final String readme = Files.readString(
-            SQL_DIRECTORY.resolve("README.md"),
+            Path.of("README.md"),
             StandardCharsets.UTF_8
         );
 
-        assertTrue(readme.contains("quattro script SQL ufficiali"));
         assertTrue(readme.contains("Nuova installazione"));
-        assertTrue(readme.contains("Aggiornamento della prima versione"));
+        assertTrue(readme.contains(
+            "Aggiornamento di un database della prima versione"
+        ));
+        assertTrue(readme.contains("doc/sql/01_schema_completo.sql"));
+        assertTrue(readme.contains("doc/sql/03_migrazione_database_esistente.sql"));
     }
 
     private String read(final String fileName) throws IOException {

@@ -19,9 +19,6 @@ CREATE TABLE IF NOT EXISTS UTENTE (
     Scadenza_Certificato_Medico DATE,
     Email VARCHAR(255),
     Telefono VARCHAR(30),
-    Creato_Il TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    Aggiornato_Il TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
-        ON UPDATE CURRENT_TIMESTAMP,
     CONSTRAINT PK_UTENTE PRIMARY KEY (ID_Utente),
     CONSTRAINT UQ_UTENTE_CODICE_FISCALE UNIQUE (Codice_Fiscale),
     CONSTRAINT UQ_UTENTE_EMAIL UNIQUE (Email),
@@ -36,22 +33,29 @@ CREATE TABLE IF NOT EXISTS UTENTE (
     )
 );
 
--- Allinea anche le installazioni precedenti, nelle quali UTENTE aveva uno
--- stato applicativo ora demandato esclusivamente ad ACCOUNT.Attivo.
-SET @drop_utente_attivo = IF(
-    EXISTS (
-        SELECT 1
-        FROM information_schema.COLUMNS
-        WHERE TABLE_SCHEMA = DATABASE()
-          AND TABLE_NAME = 'UTENTE'
-          AND COLUMN_NAME = 'Attivo'
-    ),
-    'ALTER TABLE UTENTE DROP COLUMN Attivo',
-    'SELECT 1'
+-- Allinea anche le installazioni precedenti eliminando gli attributi tecnici
+-- non appartenenti all'anagrafica del dominio.
+SET @drop_utente_obsoleti = (
+    SELECT IF(
+        COUNT(*) = 0,
+        'SELECT 1',
+        CONCAT(
+            'ALTER TABLE UTENTE ',
+            GROUP_CONCAT(
+                CONCAT('DROP COLUMN `', COLUMN_NAME, '`')
+                ORDER BY ORDINAL_POSITION
+                SEPARATOR ', '
+            )
+        )
+    )
+    FROM information_schema.COLUMNS
+    WHERE TABLE_SCHEMA = DATABASE()
+      AND TABLE_NAME = 'UTENTE'
+      AND COLUMN_NAME IN ('Attivo', 'Creato_Il', 'Aggiornato_Il')
 );
-PREPARE drop_utente_attivo FROM @drop_utente_attivo;
-EXECUTE drop_utente_attivo;
-DEALLOCATE PREPARE drop_utente_attivo;
+PREPARE drop_utente_obsoleti FROM @drop_utente_obsoleti;
+EXECUTE drop_utente_obsoleti;
+DEALLOCATE PREPARE drop_utente_obsoleti;
 
 -- Specializzazione parziale e sovrapposta di UTENTE.
 CREATE TABLE IF NOT EXISTS ATLETA (
@@ -399,7 +403,6 @@ CREATE TABLE IF NOT EXISTS ACCOUNT (
     Password_Iterazioni INT UNSIGNED NOT NULL,
     Ruolo VARCHAR(30) NOT NULL DEFAULT 'UTENTE',
     Attivo BOOLEAN NOT NULL DEFAULT TRUE,
-    Creato_Il TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     Ultimo_Accesso TIMESTAMP NULL,
     CONSTRAINT PK_ACCOUNT PRIMARY KEY (ID_Account),
     CONSTRAINT UQ_ACCOUNT_EMAIL UNIQUE (Email),
@@ -430,6 +433,22 @@ CREATE TABLE IF NOT EXISTS ACCOUNT (
             AND ID_Utente IS NOT NULL AND ID_Club IS NULL)
     )
 );
+
+-- Rimuove l'attributo tecnico non utilizzato dalle installazioni precedenti.
+SET @drop_account_creato_il = IF(
+    EXISTS (
+        SELECT 1
+        FROM information_schema.COLUMNS
+        WHERE TABLE_SCHEMA = DATABASE()
+          AND TABLE_NAME = 'ACCOUNT'
+          AND COLUMN_NAME = 'Creato_Il'
+    ),
+    'ALTER TABLE ACCOUNT DROP COLUMN Creato_Il',
+    'SELECT 1'
+);
+PREPARE drop_account_creato_il FROM @drop_account_creato_il;
+EXECUTE drop_account_creato_il;
+DEALLOCATE PREPARE drop_account_creato_il;
 
 -- Viste operative e aggregate corrispondenti a OP7-OP11.
 CREATE OR REPLACE VIEW VW_ATTIVITA_COMPLETE AS
