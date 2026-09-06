@@ -5,7 +5,7 @@
 -- annullata prima delle consultazioni, quindi non sporcano il database.
 USE piscina_progetto;
 
-SET @dal = CURRENT_DATE - INTERVAL 1 YEAR;
+SET @dal = MAKEDATE(YEAR(CURRENT_DATE), 1);
 SET @al = CURRENT_DATE;
 START TRANSACTION;
 
@@ -270,19 +270,17 @@ ORDER BY Titolo;
 SELECT ID_Club AS ID, Nome, Numero_Atleti AS Atleti_Attivi 
 FROM VW_CLUB_ATLETI_ATTIVI 
 ORDER BY Numero_Atleti DESC, Nome; 
-;
 
 SELECT ID_Squadra AS ID, Nome, Club, Numero_Atleti AS Atleti_Attivi 
 FROM VW_SQUADRA_ATLETI_ATTIVI 
 ORDER BY Numero_Atleti DESC, Nome; 
-;
 
 -- OP9: classifica degli istruttori per attività sovrapposte al periodo richiesto.
 
 SELECT
-    i.ID_Utente,
+    i.ID_Utente AS ID,
     CONCAT(u.Cognome, ' ', u.Nome) AS Istruttore,
-    COUNT(ap.ID_Attivita_Programmata) AS Numero_Attivita
+    COUNT(ap.ID_Attivita_Programmata) AS Attivita
 FROM ISTRUTTORE i
 JOIN UTENTE u ON u.ID_Utente = i.ID_Utente
 LEFT JOIN ASSEGNATO_A aa
@@ -292,8 +290,7 @@ LEFT JOIN ATTIVITA_PROGRAMMATA ap
  AND ap.Periodo_Inizio <= @al
  AND ap.Periodo_Fine >= @dal
 GROUP BY i.ID_Utente, u.Cognome, u.Nome
-ORDER BY Numero_Attivita DESC
-;
+ORDER BY Attivita DESC, u.Cognome, u.Nome;
 
 -- OP10: tipo di attività a iscrizione e tipo di abbonamento più frequenti.
 -- Come nella GUI: un unico risultato, inclusi i tipi con frequenza zero.
@@ -319,5 +316,5 @@ ORDER BY Ambito, Frequenza DESC, Nome
 ;
 
 -- OP11: numero di abbonamenti attualmente utilizzabili.
-SELECT COUNT(*) AS Abbonamenti_Utilizzabili
+SELECT COUNT(*) AS Abbonamenti_Attualmente_Utilizzabili
 FROM VW_ABBONAMENTI_UTILIZZABILI;
