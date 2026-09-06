@@ -262,19 +262,19 @@ ROLLBACK;
 -- ===========================================================================
 
 -- OP7: attività che hanno raggiunto la capienza.
-SELECT *
-FROM VW_ATTIVITA_COMPLETE
-ORDER BY Titolo;
+SELECT ID_Attivita_Programmata AS ID, Titolo, Numero_Iscrizioni AS Iscritti, Capienza_Massima AS Capienza 
+FROM VW_ATTIVITA_COMPLETE 
+ORDER BY Titolo; 
 
 -- OP8: classifiche di club e squadre; tutti i pari merito sono visibili.
-SELECT *
-FROM VW_CLUB_ATLETI_ATTIVI
-ORDER BY Numero_Atleti DESC, Nome
+SELECT ID_Club AS ID, Nome, Numero_Atleti AS Atleti_Attivi 
+FROM VW_CLUB_ATLETI_ATTIVI 
+ORDER BY Numero_Atleti DESC, Nome; 
 ;
 
-SELECT *
-FROM VW_SQUADRA_ATLETI_ATTIVI
-ORDER BY Numero_Atleti DESC, Nome
+SELECT ID_Squadra AS ID, Nome, Club, Numero_Atleti AS Atleti_Attivi 
+FROM VW_SQUADRA_ATLETI_ATTIVI 
+ORDER BY Numero_Atleti DESC, Nome; 
 ;
 
 -- OP9: classifica degli istruttori per attività sovrapposte al periodo richiesto.
