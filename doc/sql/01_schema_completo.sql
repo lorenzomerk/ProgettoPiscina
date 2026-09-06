@@ -410,11 +410,11 @@ CREATE TABLE IF NOT EXISTS ACCOUNT (
     CONSTRAINT UQ_ACCOUNT_CLUB UNIQUE (ID_Club),
     CONSTRAINT FK_ACCOUNT_UTENTE FOREIGN KEY (ID_Utente)
         REFERENCES UTENTE (ID_Utente)
-        ON UPDATE CASCADE
+        ON UPDATE RESTRICT
         ON DELETE RESTRICT,
     CONSTRAINT FK_ACCOUNT_CLUB FOREIGN KEY (ID_Club)
         REFERENCES CLUB_SPORTIVO (ID_Club)
-        ON UPDATE CASCADE
+        ON UPDATE RESTRICT
         ON DELETE RESTRICT,
     CONSTRAINT CK_ACCOUNT_RUOLO CHECK (
         Ruolo IN (
@@ -511,6 +511,10 @@ WHERE a.Stato = 'ATTIVO'
 
 DELIMITER $$
 
+-- I controlli condivisi usano letture correnti con blocco: uno snapshot
+-- REPEATABLE READ precedente non deve nascondere le modifiche già confermate.
+-- FOR SHARE consente di leggere anche la tabella su cui opera il trigger.
+
 DROP TRIGGER IF EXISTS TR_COMPATIBILITA_BI$$
 CREATE TRIGGER TR_COMPATIBILITA_BI
 BEFORE INSERT ON COMPATIBILITA
@@ -522,11 +526,13 @@ BEGIN
     SELECT Modalita_Validita
       INTO v_modalita_validita
       FROM TIPO_ABBONAMENTO
-     WHERE ID_Tipo_Abbonamento = NEW.ID_Tipo_Abbonamento;
+     WHERE ID_Tipo_Abbonamento = NEW.ID_Tipo_Abbonamento
+     FOR SHARE;
     SELECT Modalita_Partecipazione
       INTO v_modalita_partecipazione
       FROM TIPO_ATTIVITA
-     WHERE ID_Tipo_Attivita = NEW.ID_Tipo_Attivita;
+     WHERE ID_Tipo_Attivita = NEW.ID_Tipo_Attivita
+     FOR SHARE;
 
     IF v_modalita_validita = 'INGRESSI'
        AND v_modalita_partecipazione <> 'ACCESSO_LIBERO' THEN
@@ -548,6 +554,7 @@ BEGIN
     ) AND EXISTS (
         SELECT 1 FROM ABBONAMENTO a
          WHERE a.ID_Tipo_Abbonamento = OLD.ID_Tipo_Abbonamento
+        FOR SHARE
     ) THEN
         SIGNAL SQLSTATE '45000'
             SET MESSAGE_TEXT =
@@ -561,6 +568,7 @@ BEGIN
          WHERE c.ID_Tipo_Abbonamento =
                OLD.ID_Tipo_Abbonamento
            AND ta.Modalita_Partecipazione <> 'ACCESSO_LIBERO'
+        FOR SHARE
     ) THEN
         SIGNAL SQLSTATE '45000'
             SET MESSAGE_TEXT =
@@ -570,6 +578,7 @@ BEGIN
         SELECT 1
           FROM COMPATIBILITA c
          WHERE c.ID_Tipo_Abbonamento = OLD.ID_Tipo_Abbonamento
+        FOR SHARE
     ) THEN
         SIGNAL SQLSTATE '45000'
             SET MESSAGE_TEXT =
@@ -586,6 +595,7 @@ BEGIN
        OLD.Modalita_Partecipazione AND EXISTS (
         SELECT 1 FROM ATTIVITA_PROGRAMMATA ap
          WHERE ap.ID_Tipo_Attivita = OLD.ID_Tipo_Attivita
+        FOR SHARE
     ) THEN
         SIGNAL SQLSTATE '45000'
             SET MESSAGE_TEXT =
@@ -599,6 +609,7 @@ BEGIN
                c.ID_Tipo_Abbonamento
          WHERE c.ID_Tipo_Attivita = OLD.ID_Tipo_Attivita
            AND t.Modalita_Validita = 'INGRESSI'
+        FOR SHARE
     ) THEN
         SIGNAL SQLSTATE '45000'
             SET MESSAGE_TEXT =
@@ -614,7 +625,9 @@ BEGIN
                SELECT 1 FROM ASSEGNATO_A aa
                 WHERE aa.ID_Attivita_Programmata =
                       ap.ID_Attivita_Programmata
+               FOR SHARE
            )
+        FOR SHARE
     ) THEN
         SIGNAL SQLSTATE '45000'
             SET MESSAGE_TEXT =
@@ -644,10 +657,12 @@ BEGIN
           FROM TIPO_ABBONAMENTO t
          WHERE t.ID_Tipo_Abbonamento = OLD.ID_Tipo_Abbonamento
            AND t.Attivo = TRUE
+        FOR SHARE
     ) AND (
         SELECT COUNT(*)
           FROM COMPATIBILITA c
          WHERE c.ID_Tipo_Abbonamento = OLD.ID_Tipo_Abbonamento
+        FOR SHARE
     ) = 1 THEN
         SIGNAL SQLSTATE '45000'
             SET MESSAGE_TEXT =
@@ -668,7 +683,8 @@ BEGIN
     SELECT Modalita_Validita, Durata_Giorni, Numero_Ingressi, Attivo
       INTO v_modalita, v_durata, v_ingressi, v_tipo_attivo
       FROM TIPO_ABBONAMENTO
-     WHERE ID_Tipo_Abbonamento = NEW.ID_Tipo_Abbonamento;
+     WHERE ID_Tipo_Abbonamento = NEW.ID_Tipo_Abbonamento
+     FOR SHARE;
 
     IF v_tipo_attivo = FALSE THEN
         SIGNAL SQLSTATE '45000'
@@ -705,10 +721,10 @@ BEGIN
         IF NEW.Ingressi_Rimanenti IS NULL THEN
             SET NEW.Ingressi_Rimanenti = v_ingressi;
         END IF;
-        IF NEW.Ingressi_Rimanenti > v_ingressi THEN
+        IF NEW.Ingressi_Rimanenti <> v_ingressi THEN
             SIGNAL SQLSTATE '45000'
                 SET MESSAGE_TEXT =
-                    'Gli ingressi residui superano quelli del tipo';
+                    'Un nuovo abbonamento deve avere tutti gli ingressi del tipo';
         END IF;
     END IF;
     IF v_modalita = 'TEMPO'
@@ -730,28 +746,33 @@ BEGIN
     DECLARE v_modalita VARCHAR(20);
     DECLARE v_durata INT;
     DECLARE v_ingressi INT;
+    DECLARE v_accessi INT;
 
     SELECT Modalita_Validita, Durata_Giorni, Numero_Ingressi
       INTO v_modalita, v_durata, v_ingressi
       FROM TIPO_ABBONAMENTO
-     WHERE ID_Tipo_Abbonamento = NEW.ID_Tipo_Abbonamento;
+     WHERE ID_Tipo_Abbonamento = NEW.ID_Tipo_Abbonamento
+     FOR SHARE;
 
-    IF (
-        NEW.ID_Utente <> OLD.ID_Utente
-        OR NEW.ID_Tipo_Abbonamento <> OLD.ID_Tipo_Abbonamento
-    ) AND (
-        EXISTS (
-            SELECT 1 FROM ISCRIZIONE_ATTIVITA i
-             WHERE i.ID_Abbonamento = OLD.ID_Abbonamento
-        )
-        OR EXISTS (
-            SELECT 1 FROM ACCESSO_NUOTO_LIBERO x
-             WHERE x.ID_Abbonamento = OLD.ID_Abbonamento
-        )
-    ) THEN
+    IF NEW.ID_Abbonamento <> OLD.ID_Abbonamento
+       OR NEW.ID_Utente <> OLD.ID_Utente
+       OR NEW.ID_Tipo_Abbonamento <> OLD.ID_Tipo_Abbonamento
+       OR NEW.Data_Acquisto <> OLD.Data_Acquisto
+       OR NEW.Data_Inizio <> OLD.Data_Inizio
+       OR NOT (NEW.Data_Fine <=> OLD.Data_Fine) THEN
         SIGNAL SQLSTATE '45000'
-            SET MESSAGE_TEXT =
-                'Un abbonamento gia utilizzato non puo cambiare titolare o tipo';
+            SET MESSAGE_TEXT = 'I dati di un acquisto sono storici e non modificabili';
+    END IF;
+    IF v_modalita = 'INGRESSI' THEN
+        SELECT COUNT(*) INTO v_accessi
+          FROM ACCESSO_NUOTO_LIBERO
+         WHERE ID_Abbonamento = OLD.ID_Abbonamento
+         FOR SHARE;
+        IF NEW.Ingressi_Rimanenti IS NULL
+           OR NEW.Ingressi_Rimanenti <> v_ingressi - v_accessi THEN
+            SIGNAL SQLSTATE '45000'
+                SET MESSAGE_TEXT = 'Gli ingressi residui devono corrispondere agli accessi registrati';
+        END IF;
     END IF;
 
     IF NEW.Data_Acquisto > NEW.Data_Inizio THEN
@@ -810,8 +831,32 @@ CREATE TRIGGER TR_ATTIVITA_BU
 BEFORE UPDATE ON ATTIVITA_PROGRAMMATA
 FOR EACH ROW
 BEGIN
+    DECLARE v_iscritti INT;
     DECLARE v_modalita VARCHAR(30);
     DECLARE v_richiede_istruttore BOOLEAN;
+
+    SELECT COUNT(*) INTO v_iscritti
+      FROM ISCRIZIONE_ATTIVITA
+     WHERE ID_Attivita_Programmata = OLD.ID_Attivita_Programmata
+     FOR UPDATE;
+    IF NEW.Capienza_Massima < v_iscritti THEN
+        SIGNAL SQLSTATE '45000'
+            SET MESSAGE_TEXT = 'La capienza non puo essere inferiore agli iscritti';
+    END IF;
+    IF (NEW.ID_Tipo_Attivita <> OLD.ID_Tipo_Attivita
+        OR NEW.Periodo_Inizio <> OLD.Periodo_Inizio
+        OR NEW.Periodo_Fine <> OLD.Periodo_Fine
+        OR NEW.Giorno_Settimanale <> OLD.Giorno_Settimanale
+        OR NEW.Ora_Inizio <> OLD.Ora_Inizio
+        OR NEW.Ora_Fine <> OLD.Ora_Fine)
+       AND (v_iscritti > 0 OR EXISTS (
+           SELECT 1 FROM ACCESSO_NUOTO_LIBERO
+            WHERE ID_Attivita_Programmata = OLD.ID_Attivita_Programmata
+           FOR SHARE
+       )) THEN
+        SIGNAL SQLSTATE '45000'
+            SET MESSAGE_TEXT = 'Tipo e calendario di una attivita con partecipazioni sono storici';
+    END IF;
 
     IF NEW.Periodo_Inizio > NEW.Periodo_Fine
        OR NEW.Ora_Inizio >= NEW.Ora_Fine THEN
@@ -822,12 +867,14 @@ BEGIN
     SELECT Modalita_Partecipazione, Richiede_Istruttore
       INTO v_modalita, v_richiede_istruttore
       FROM TIPO_ATTIVITA
-     WHERE ID_Tipo_Attivita = NEW.ID_Tipo_Attivita;
+     WHERE ID_Tipo_Attivita = NEW.ID_Tipo_Attivita
+     FOR SHARE;
 
     IF v_modalita <> 'ISCRIZIONE' AND EXISTS (
         SELECT 1 FROM ISCRIZIONE_ATTIVITA i
          WHERE i.ID_Attivita_Programmata =
                OLD.ID_Attivita_Programmata
+        FOR SHARE
     ) THEN
         SIGNAL SQLSTATE '45000'
             SET MESSAGE_TEXT =
@@ -837,6 +884,7 @@ BEGIN
         SELECT 1 FROM ACCESSO_NUOTO_LIBERO x
          WHERE x.ID_Attivita_Programmata =
                OLD.ID_Attivita_Programmata
+        FOR SHARE
     ) THEN
         SIGNAL SQLSTATE '45000'
             SET MESSAGE_TEXT =
@@ -846,6 +894,7 @@ BEGIN
         SELECT 1 FROM SVOLGE s
          WHERE s.ID_Attivita_Programmata =
                OLD.ID_Attivita_Programmata
+        FOR SHARE
     ) THEN
         SIGNAL SQLSTATE '45000'
             SET MESSAGE_TEXT =
@@ -873,6 +922,7 @@ BEGIN
            AND NEW.Periodo_Inizio <= esistente.Periodo_Fine
            AND esistente.Ora_Inizio < NEW.Ora_Fine
            AND NEW.Ora_Inizio < esistente.Ora_Fine
+        FOR SHARE
     ) THEN
         SIGNAL SQLSTATE '45000'
             SET MESSAGE_TEXT =
@@ -900,6 +950,7 @@ BEGIN
            AND NEW.Periodo_Inizio <= esistente.Periodo_Fine
            AND esistente.Ora_Inizio < NEW.Ora_Fine
            AND NEW.Ora_Inizio < esistente.Ora_Fine
+        FOR SHARE
     ) THEN
         SIGNAL SQLSTATE '45000'
             SET MESSAGE_TEXT =
@@ -911,6 +962,7 @@ BEGIN
             SELECT 1 FROM UTILIZZA u
              WHERE u.ID_Attivita_Programmata =
                    OLD.ID_Attivita_Programmata
+            FOR SHARE
         ) THEN
             SIGNAL SQLSTATE '45000'
                 SET MESSAGE_TEXT =
@@ -920,6 +972,7 @@ BEGIN
             SELECT 1 FROM ASSEGNATO_A a
              WHERE a.ID_Attivita_Programmata =
                    OLD.ID_Attivita_Programmata
+            FOR SHARE
         ) THEN
             SIGNAL SQLSTATE '45000'
                 SET MESSAGE_TEXT =
@@ -929,6 +982,7 @@ BEGIN
             SELECT 1 FROM SVOLGE s
              WHERE s.ID_Attivita_Programmata =
                    OLD.ID_Attivita_Programmata
+            FOR SHARE
         ) THEN
             SIGNAL SQLSTATE '45000'
                 SET MESSAGE_TEXT =
@@ -959,7 +1013,7 @@ BEGIN
       INTO v_utente, v_tipo_abbonamento, v_stato_abbonamento,
            v_data_inizio, v_data_fine, v_ingressi
       FROM ABBONAMENTO
-     WHERE ID_Abbonamento = NEW.ID_Abbonamento;
+     WHERE ID_Abbonamento = NEW.ID_Abbonamento FOR UPDATE;
 
     SELECT ap.ID_Tipo_Attivita, ap.Stato, ta.Modalita_Partecipazione,
            ap.Capienza_Massima
@@ -968,7 +1022,7 @@ BEGIN
       JOIN TIPO_ATTIVITA ta
         ON ta.ID_Tipo_Attivita = ap.ID_Tipo_Attivita
      WHERE ap.ID_Attivita_Programmata =
-           NEW.ID_Attivita_Programmata;
+           NEW.ID_Attivita_Programmata FOR UPDATE;
 
     IF v_modalita <> 'ISCRIZIONE'
        OR v_stato_attivita IN ('CONCLUSA', 'ANNULLATA') THEN
@@ -988,6 +1042,7 @@ BEGIN
         SELECT 1 FROM COMPATIBILITA c
          WHERE c.ID_Tipo_Abbonamento = v_tipo_abbonamento
            AND c.ID_Tipo_Attivita = v_tipo_attivita
+        FOR SHARE
     ) THEN
         SIGNAL SQLSTATE '45000'
             SET MESSAGE_TEXT = 'Abbonamento non compatibile';
@@ -1000,6 +1055,7 @@ BEGIN
          WHERE i.ID_Attivita_Programmata =
                NEW.ID_Attivita_Programmata
            AND a.ID_Utente = v_utente
+        FOR SHARE
     ) THEN
         SIGNAL SQLSTATE '45000'
             SET MESSAGE_TEXT = 'Utente gia iscritto a questa attivita';
@@ -1007,7 +1063,7 @@ BEGIN
     SELECT COUNT(*) INTO v_iscritti
       FROM ISCRIZIONE_ATTIVITA
      WHERE ID_Attivita_Programmata =
-           NEW.ID_Attivita_Programmata;
+           NEW.ID_Attivita_Programmata FOR SHARE;
     IF v_iscritti >= v_capienza THEN
         SIGNAL SQLSTATE '45000'
             SET MESSAGE_TEXT = 'Capienza massima raggiunta';
@@ -1057,7 +1113,7 @@ BEGIN
       JOIN TIPO_ATTIVITA ta
         ON ta.ID_Tipo_Attivita = ap.ID_Tipo_Attivita
      WHERE ap.ID_Attivita_Programmata =
-           NEW.ID_Attivita_Programmata;
+           NEW.ID_Attivita_Programmata FOR UPDATE;
 
     SET v_giorno_accesso = CASE DAYOFWEEK(NEW.Data_Ora_Accesso)
         WHEN 1 THEN 'DOMENICA'
@@ -1095,18 +1151,25 @@ BEGIN
         SELECT 1 FROM COMPATIBILITA c
          WHERE c.ID_Tipo_Abbonamento = v_tipo_abbonamento
            AND c.ID_Tipo_Attivita = v_tipo_attivita
+        FOR SHARE
     ) THEN
         SIGNAL SQLSTATE '45000'
             SET MESSAGE_TEXT = 'Abbonamento non compatibile';
     END IF;
 
-    IF v_modalita_validita = 'INGRESSI' THEN
-        UPDATE ABBONAMENTO
-           SET Ingressi_Rimanenti = v_ingressi - 1,
-               Stato = IF(v_ingressi - 1 = 0,
-                          'ESAURITO', 'ATTIVO')
-         WHERE ID_Abbonamento = NEW.ID_Abbonamento;
-    END IF;
+END$$
+
+DROP TRIGGER IF EXISTS TR_ACCESSO_AI$$
+CREATE TRIGGER TR_ACCESSO_AI
+AFTER INSERT ON ACCESSO_NUOTO_LIBERO
+FOR EACH ROW
+BEGIN
+    -- La riga di accesso esiste già: TR_ABBONAMENTO_BU può verificare il
+    -- residuo sullo storico completo. Il tutto appartiene allo stesso statement.
+    UPDATE ABBONAMENTO
+       SET Ingressi_Rimanenti = Ingressi_Rimanenti - 1
+     WHERE ID_Abbonamento = NEW.ID_Abbonamento
+       AND Ingressi_Rimanenti IS NOT NULL;
 END$$
 
 DROP TRIGGER IF EXISTS TR_UTILIZZA_BI$$
@@ -1114,6 +1177,10 @@ CREATE TRIGGER TR_UTILIZZA_BI
 BEFORE INSERT ON UTILIZZA
 FOR EACH ROW
 BEGIN
+    DECLARE v_lock BIGINT UNSIGNED;
+    SELECT Numero INTO v_lock FROM CORSIA WHERE ID_Vasca = NEW.ID_Vasca AND Numero = NEW.Numero_Corsia FOR UPDATE;
+    SELECT ID_Attivita_Programmata INTO v_lock FROM ATTIVITA_PROGRAMMATA
+     WHERE ID_Attivita_Programmata = NEW.ID_Attivita_Programmata FOR UPDATE;
     IF EXISTS (
         SELECT 1
           FROM UTILIZZA u
@@ -1133,6 +1200,7 @@ BEGIN
            AND nuova.Periodo_Inizio <= esistente.Periodo_Fine
            AND esistente.Ora_Inizio < nuova.Ora_Fine
            AND nuova.Ora_Inizio < esistente.Ora_Fine
+        FOR SHARE
     ) THEN
         SIGNAL SQLSTATE '45000'
             SET MESSAGE_TEXT = 'Corsia gia occupata nella stessa fascia';
@@ -1144,14 +1212,20 @@ CREATE TRIGGER TR_UTILIZZA_BD
 BEFORE DELETE ON UTILIZZA
 FOR EACH ROW
 BEGIN
+    DECLARE v_lock BIGINT UNSIGNED;
+
+    SELECT ID_Attivita_Programmata INTO v_lock FROM ATTIVITA_PROGRAMMATA
+     WHERE ID_Attivita_Programmata = OLD.ID_Attivita_Programmata FOR UPDATE;
     IF (
         SELECT Stato FROM ATTIVITA_PROGRAMMATA
          WHERE ID_Attivita_Programmata =
                OLD.ID_Attivita_Programmata
+        FOR SHARE
     ) = 'ATTIVA' AND (
         SELECT COUNT(*) FROM UTILIZZA
          WHERE ID_Attivita_Programmata =
                OLD.ID_Attivita_Programmata
+        FOR SHARE
     ) = 1 THEN
         SIGNAL SQLSTATE '45000'
             SET MESSAGE_TEXT =
@@ -1164,6 +1238,10 @@ CREATE TRIGGER TR_ASSEGNATO_A_BI
 BEFORE INSERT ON ASSEGNATO_A
 FOR EACH ROW
 BEGIN
+    DECLARE v_lock BIGINT UNSIGNED;
+    SELECT ID_Utente INTO v_lock FROM ISTRUTTORE WHERE ID_Utente = NEW.ID_Utente_Istruttore FOR UPDATE;
+    SELECT ID_Attivita_Programmata INTO v_lock FROM ATTIVITA_PROGRAMMATA
+     WHERE ID_Attivita_Programmata = NEW.ID_Attivita_Programmata FOR UPDATE;
     IF EXISTS (
         SELECT 1
           FROM ASSEGNATO_A aa
@@ -1183,6 +1261,7 @@ BEGIN
            AND nuova.Periodo_Inizio <= esistente.Periodo_Fine
            AND esistente.Ora_Inizio < nuova.Ora_Fine
            AND nuova.Ora_Inizio < esistente.Ora_Fine
+        FOR SHARE
     ) THEN
         SIGNAL SQLSTATE '45000'
             SET MESSAGE_TEXT =
@@ -1195,6 +1274,10 @@ CREATE TRIGGER TR_ASSEGNATO_A_BD
 BEFORE DELETE ON ASSEGNATO_A
 FOR EACH ROW
 BEGIN
+    DECLARE v_lock BIGINT UNSIGNED;
+
+    SELECT ID_Attivita_Programmata INTO v_lock FROM ATTIVITA_PROGRAMMATA
+     WHERE ID_Attivita_Programmata = OLD.ID_Attivita_Programmata FOR UPDATE;
     IF EXISTS (
         SELECT 1
           FROM ATTIVITA_PROGRAMMATA ap
@@ -1204,10 +1287,12 @@ BEGIN
                OLD.ID_Attivita_Programmata
            AND ap.Stato = 'ATTIVA'
            AND ta.Richiede_Istruttore = TRUE
+        FOR SHARE
     ) AND (
         SELECT COUNT(*) FROM ASSEGNATO_A
          WHERE ID_Attivita_Programmata =
                OLD.ID_Attivita_Programmata
+        FOR SHARE
     ) = 1 THEN
         SIGNAL SQLSTATE '45000'
             SET MESSAGE_TEXT =
@@ -1220,6 +1305,9 @@ CREATE TRIGGER TR_APPARTENENZA_BI
 BEFORE INSERT ON APPARTENENZA_SQUADRA
 FOR EACH ROW
 BEGIN
+    DECLARE v_lock BIGINT UNSIGNED;
+    SELECT ID_Utente INTO v_lock FROM ATLETA
+     WHERE ID_Utente = NEW.ID_Utente_Atleta FOR UPDATE;
     IF NEW.Data_Fine IS NOT NULL
        AND NEW.Data_Inizio > NEW.Data_Fine THEN
         SIGNAL SQLSTATE '45000'
@@ -1230,6 +1318,7 @@ BEGIN
          WHERE a.ID_Utente_Atleta = NEW.ID_Utente_Atleta
            AND a.Data_Inizio <= COALESCE(NEW.Data_Fine, '9999-12-31')
            AND NEW.Data_Inizio <= COALESCE(a.Data_Fine, '9999-12-31')
+        FOR SHARE
     ) THEN
         SIGNAL SQLSTATE '45000'
             SET MESSAGE_TEXT =
@@ -1242,6 +1331,16 @@ CREATE TRIGGER TR_APPARTENENZA_BU
 BEFORE UPDATE ON APPARTENENZA_SQUADRA
 FOR EACH ROW
 BEGIN
+    DECLARE v_lock BIGINT UNSIGNED;
+    SELECT ID_Utente INTO v_lock FROM ATLETA
+     WHERE ID_Utente = NEW.ID_Utente_Atleta FOR UPDATE;
+    IF NEW.ID_Appartenenza <> OLD.ID_Appartenenza
+       OR NEW.ID_Utente_Atleta <> OLD.ID_Utente_Atleta
+       OR NEW.ID_Squadra <> OLD.ID_Squadra
+       OR NEW.Data_Inizio <> OLD.Data_Inizio THEN
+        SIGNAL SQLSTATE '45000'
+            SET MESSAGE_TEXT = 'Il rapporto storico consente solo la modifica della data di fine';
+    END IF;
     IF NEW.Data_Fine IS NOT NULL
        AND NEW.Data_Inizio > NEW.Data_Fine THEN
         SIGNAL SQLSTATE '45000'
@@ -1253,6 +1352,7 @@ BEGIN
            AND a.ID_Appartenenza <> OLD.ID_Appartenenza
            AND a.Data_Inizio <= COALESCE(NEW.Data_Fine, '9999-12-31')
            AND NEW.Data_Inizio <= COALESCE(a.Data_Fine, '9999-12-31')
+        FOR SHARE
     ) THEN
         SIGNAL SQLSTATE '45000'
             SET MESSAGE_TEXT =
@@ -1265,6 +1365,9 @@ CREATE TRIGGER TR_INCARICO_BI
 BEFORE INSERT ON INCARICO_SQUADRA
 FOR EACH ROW
 BEGIN
+    DECLARE v_lock BIGINT UNSIGNED;
+    SELECT ID_Utente INTO v_lock FROM ISTRUTTORE
+     WHERE ID_Utente = NEW.ID_Utente_Istruttore FOR UPDATE;
     IF NEW.Data_Fine IS NOT NULL
        AND NEW.Data_Inizio > NEW.Data_Fine THEN
         SIGNAL SQLSTATE '45000'
@@ -1277,6 +1380,7 @@ BEGIN
            AND i.ID_Squadra = NEW.ID_Squadra
            AND i.Data_Inizio <= COALESCE(NEW.Data_Fine, '9999-12-31')
            AND NEW.Data_Inizio <= COALESCE(i.Data_Fine, '9999-12-31')
+        FOR SHARE
     ) THEN
         SIGNAL SQLSTATE '45000'
             SET MESSAGE_TEXT =
@@ -1289,6 +1393,16 @@ CREATE TRIGGER TR_INCARICO_BU
 BEFORE UPDATE ON INCARICO_SQUADRA
 FOR EACH ROW
 BEGIN
+    DECLARE v_lock BIGINT UNSIGNED;
+    SELECT ID_Utente INTO v_lock FROM ISTRUTTORE
+     WHERE ID_Utente = NEW.ID_Utente_Istruttore FOR UPDATE;
+    IF NEW.ID_Incarico_Squadra <> OLD.ID_Incarico_Squadra
+       OR NEW.ID_Utente_Istruttore <> OLD.ID_Utente_Istruttore
+       OR NEW.ID_Squadra <> OLD.ID_Squadra
+       OR NEW.Data_Inizio <> OLD.Data_Inizio THEN
+        SIGNAL SQLSTATE '45000'
+            SET MESSAGE_TEXT = 'Il rapporto storico consente solo la modifica della data di fine';
+    END IF;
     IF NEW.Data_Fine IS NOT NULL
        AND NEW.Data_Inizio > NEW.Data_Fine THEN
         SIGNAL SQLSTATE '45000'
@@ -1302,6 +1416,7 @@ BEGIN
            AND i.ID_Incarico_Squadra <> OLD.ID_Incarico_Squadra
            AND i.Data_Inizio <= COALESCE(NEW.Data_Fine, '9999-12-31')
            AND NEW.Data_Inizio <= COALESCE(i.Data_Fine, '9999-12-31')
+        FOR SHARE
     ) THEN
         SIGNAL SQLSTATE '45000'
             SET MESSAGE_TEXT =
@@ -1324,6 +1439,7 @@ BEGIN
          WHERE ap.ID_Attivita_Programmata =
                NEW.ID_Attivita_Programmata
            AND ta.Modalita_Partecipazione = 'SQUADRA'
+        FOR SHARE
     ) THEN
         SIGNAL SQLSTATE '45000'
             SET MESSAGE_TEXT =
@@ -1333,7 +1449,8 @@ BEGIN
     -- Nuovo controllo di integrità temporale
     SELECT Stato INTO v_stato
       FROM ATTIVITA_PROGRAMMATA
-     WHERE ID_Attivita_Programmata = NEW.ID_Attivita_Programmata;
+     WHERE ID_Attivita_Programmata = NEW.ID_Attivita_Programmata
+     FOR SHARE;
 
     IF v_stato IN ('CONCLUSA', 'ANNULLATA') THEN
         SIGNAL SQLSTATE '45000'
@@ -1347,19 +1464,126 @@ CREATE TRIGGER TR_SVOLGE_BD
 BEFORE DELETE ON SVOLGE
 FOR EACH ROW
 BEGIN
+    DECLARE v_lock BIGINT UNSIGNED;
+
+    SELECT ID_Attivita_Programmata INTO v_lock FROM ATTIVITA_PROGRAMMATA
+     WHERE ID_Attivita_Programmata = OLD.ID_Attivita_Programmata FOR UPDATE;
     IF (
         SELECT Stato FROM ATTIVITA_PROGRAMMATA
          WHERE ID_Attivita_Programmata =
                OLD.ID_Attivita_Programmata
+        FOR SHARE
     ) = 'ATTIVA' AND (
         SELECT COUNT(*) FROM SVOLGE
          WHERE ID_Attivita_Programmata =
                OLD.ID_Attivita_Programmata
+        FOR SHARE
     ) = 1 THEN
         SIGNAL SQLSTATE '45000'
             SET MESSAGE_TEXT =
                 'Una attivita di squadra attiva richiede una squadra';
     END IF;
+END$$
+
+
+-- Le rettifiche dello storico non sono operazioni di gestione ordinaria.
+DROP TRIGGER IF EXISTS TR_ISCRIZIONE_BU$$
+CREATE TRIGGER TR_ISCRIZIONE_BU
+BEFORE UPDATE ON ISCRIZIONE_ATTIVITA
+FOR EACH ROW
+BEGIN
+    SIGNAL SQLSTATE '45000'
+        SET MESSAGE_TEXT = 'ISCRIZIONE_ATTIVITA: operazione non ammessa sui dati registrati';
+END$$
+
+DROP TRIGGER IF EXISTS TR_ISCRIZIONE_BD$$
+CREATE TRIGGER TR_ISCRIZIONE_BD
+BEFORE DELETE ON ISCRIZIONE_ATTIVITA
+FOR EACH ROW
+BEGIN
+    SIGNAL SQLSTATE '45000'
+        SET MESSAGE_TEXT = 'ISCRIZIONE_ATTIVITA: operazione non ammessa sui dati registrati';
+END$$
+
+DROP TRIGGER IF EXISTS TR_ACCESSO_BU$$
+CREATE TRIGGER TR_ACCESSO_BU
+BEFORE UPDATE ON ACCESSO_NUOTO_LIBERO
+FOR EACH ROW
+BEGIN
+    SIGNAL SQLSTATE '45000'
+        SET MESSAGE_TEXT = 'ACCESSO_NUOTO_LIBERO: operazione non ammessa sui dati registrati';
+END$$
+
+DROP TRIGGER IF EXISTS TR_ACCESSO_BD$$
+CREATE TRIGGER TR_ACCESSO_BD
+BEFORE DELETE ON ACCESSO_NUOTO_LIBERO
+FOR EACH ROW
+BEGIN
+    SIGNAL SQLSTATE '45000'
+        SET MESSAGE_TEXT = 'ACCESSO_NUOTO_LIBERO: operazione non ammessa sui dati registrati';
+END$$
+
+DROP TRIGGER IF EXISTS TR_ABBONAMENTO_BD$$
+CREATE TRIGGER TR_ABBONAMENTO_BD
+BEFORE DELETE ON ABBONAMENTO
+FOR EACH ROW
+BEGIN
+    SIGNAL SQLSTATE '45000'
+        SET MESSAGE_TEXT = 'ABBONAMENTO: operazione non ammessa sui dati registrati';
+END$$
+
+DROP TRIGGER IF EXISTS TR_APPARTENENZA_BD$$
+CREATE TRIGGER TR_APPARTENENZA_BD
+BEFORE DELETE ON APPARTENENZA_SQUADRA
+FOR EACH ROW
+BEGIN
+    SIGNAL SQLSTATE '45000'
+        SET MESSAGE_TEXT = 'APPARTENENZA_SQUADRA: operazione non ammessa sui dati registrati';
+END$$
+
+DROP TRIGGER IF EXISTS TR_INCARICO_BD$$
+CREATE TRIGGER TR_INCARICO_BD
+BEFORE DELETE ON INCARICO_SQUADRA
+FOR EACH ROW
+BEGIN
+    SIGNAL SQLSTATE '45000'
+        SET MESSAGE_TEXT = 'INCARICO_SQUADRA: operazione non ammessa sui dati registrati';
+END$$
+
+DROP TRIGGER IF EXISTS TR_COMPATIBILITA_BU$$
+CREATE TRIGGER TR_COMPATIBILITA_BU
+BEFORE UPDATE ON COMPATIBILITA
+FOR EACH ROW
+BEGIN
+    SIGNAL SQLSTATE '45000'
+        SET MESSAGE_TEXT = 'COMPATIBILITA: operazione non ammessa sui dati registrati';
+END$$
+
+DROP TRIGGER IF EXISTS TR_UTILIZZA_BU$$
+CREATE TRIGGER TR_UTILIZZA_BU
+BEFORE UPDATE ON UTILIZZA
+FOR EACH ROW
+BEGIN
+    SIGNAL SQLSTATE '45000'
+        SET MESSAGE_TEXT = 'UTILIZZA: operazione non ammessa sui dati registrati';
+END$$
+
+DROP TRIGGER IF EXISTS TR_ASSEGNATO_A_BU$$
+CREATE TRIGGER TR_ASSEGNATO_A_BU
+BEFORE UPDATE ON ASSEGNATO_A
+FOR EACH ROW
+BEGIN
+    SIGNAL SQLSTATE '45000'
+        SET MESSAGE_TEXT = 'ASSEGNATO_A: operazione non ammessa sui dati registrati';
+END$$
+
+DROP TRIGGER IF EXISTS TR_SVOLGE_BU$$
+CREATE TRIGGER TR_SVOLGE_BU
+BEFORE UPDATE ON SVOLGE
+FOR EACH ROW
+BEGIN
+    SIGNAL SQLSTATE '45000'
+        SET MESSAGE_TEXT = 'SVOLGE: operazione non ammessa sui dati registrati';
 END$$
 
 DELIMITER ;

@@ -146,9 +146,16 @@ public final class JdbcGestioneDAO implements GestioneDAO {
         try (Connection connection = connectionFactory.openConnection();
                 Statement statement = connection.createStatement()) {
 
-            statement.executeUpdate(UPDATE_ABBONAMENTI_TEMPO);
-            statement.executeUpdate(UPDATE_ABBONAMENTI_INGRESSI);
-            statement.executeUpdate(UPDATE_ATTIVITA_NON_ATTIVE);
+            connection.setAutoCommit(false);
+            try {
+                statement.executeUpdate(UPDATE_ABBONAMENTI_TEMPO);
+                statement.executeUpdate(UPDATE_ABBONAMENTI_INGRESSI);
+                statement.executeUpdate(UPDATE_ATTIVITA_NON_ATTIVE);
+                connection.commit();
+            } catch (SQLException exception) {
+                connection.rollback();
+                throw exception;
+            }
         } catch (SQLException exception) {
             throw databaseError("aggiornare gli stati operativi", exception);
         }

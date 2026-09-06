@@ -1,30 +1,12 @@
 -- Gestione Piscina - query operative e dimostrative OP1-OP11.
--- Eseguire dopo 01_schema_completo.sql e 02_popolamento_demo.sql.
+-- Eseguire dopo 01_schema_completo.sql; 02_popolamento_demo.sql è facoltativo.
+-- Le risorse temporanee sono indipendenti dal giorno e dal popolamento iniziale.
 -- Le scritture dimostrative OP1-OP6 sono racchiuse in una transazione
 -- annullata prima delle consultazioni, quindi non sporcano il database.
 USE piscina_progetto;
 
 SET @dal = CURRENT_DATE - INTERVAL 1 YEAR;
 SET @al = CURRENT_DATE;
-SET @corso_demo = (
-    SELECT ID_Attivita_Programmata
-    FROM ATTIVITA_PROGRAMMATA
-    WHERE Titolo = 'Corso adulti demo'
-    LIMIT 1
-);
-SET @nuoto_libero_demo = (
-    SELECT ID_Attivita_Programmata
-    FROM ATTIVITA_PROGRAMMATA
-    WHERE Titolo = 'Nuoto libero demo'
-    LIMIT 1
-);
-SET @allenamento_demo = (
-    SELECT ID_Attivita_Programmata
-    FROM ATTIVITA_PROGRAMMATA
-    WHERE Titolo = 'Allenamento squadra demo'
-    LIMIT 1
-);
-
 START TRANSACTION;
 
 -- ===========================================================================
@@ -75,12 +57,10 @@ VALUES
      30, NULL);
 
 SET @tipo_abbonamento_query = LAST_INSERT_ID();
-SET @tipo_corso = (
-    SELECT ID_Tipo_Attivita
-    FROM TIPO_ATTIVITA
-    WHERE Nome = 'Corso di nuoto'
-    LIMIT 1
-);
+INSERT INTO TIPO_ATTIVITA
+    (Nome, Modalita_Partecipazione, Richiede_Istruttore)
+VALUES ('Corso temporaneo query', 'ISCRIZIONE', TRUE);
+SET @tipo_corso = LAST_INSERT_ID();
 
 INSERT INTO COMPATIBILITA
     (ID_Tipo_Abbonamento, ID_Tipo_Attivita)
@@ -117,30 +97,22 @@ WHERE a.ID_Abbonamento = @abbonamento_query
 -- OP3 - GESTIONE DELLE ATTIVITA E DEGLI SPAZI
 -- ===========================================================================
 
-INSERT INTO TIPO_ATTIVITA
-    (Nome, Modalita_Partecipazione,
-     Richiede_Istruttore, Descrizione)
-VALUES
-    ('Attivita temporanea query', 'ISCRIZIONE', TRUE,
-     'Creata esclusivamente per mostrare OP3');
-
-SET @tipo_attivita_query = LAST_INSERT_ID();
+SET @giorno_query = ELT(WEEKDAY(CURRENT_DATE) + 1,
+    'LUNEDI', 'MARTEDI', 'MERCOLEDI', 'GIOVEDI', 'VENERDI', 'SABATO', 'DOMENICA');
+INSERT INTO VASCA (Nome, Lunghezza, Larghezza, Profondita, Temperatura, Tipologia)
+VALUES ('Vasca temporanea query', 25, 12, 1.5, 28, 'Coperta');
+SET @vasca_principale = LAST_INSERT_ID();
+INSERT INTO CORSIA (ID_Vasca, Numero) VALUES (@vasca_principale, 1), (@vasca_principale, 2);
 
 INSERT INTO ATTIVITA_PROGRAMMATA
     (ID_Tipo_Attivita, Titolo, Giorno_Settimanale,
      Ora_Inizio, Ora_Fine, Capienza_Massima,
      Periodo_Inizio, Periodo_Fine, Stato)
-VALUES
-    (@tipo_attivita_query, 'Attivita temporanea query',
-     'DOMENICA', '02:00:00', '03:00:00', 10,
-     '2035-01-01', '2035-12-31', 'PROGRAMMATA');
-
+VALUES (@tipo_corso, 'Corso temporaneo query', @giorno_query,
+        '08:00:00', '09:00:00', 10, CURRENT_DATE,
+        CURRENT_DATE + INTERVAL 29 DAY, 'PROGRAMMATA');
 SET @attivita_query = LAST_INSERT_ID();
-SET @vasca_principale = (
-    SELECT ID_Vasca FROM VASCA
-    WHERE Nome = 'Vasca principale'
-    LIMIT 1
-);
+SET @corso_demo = @attivita_query;
 
 INSERT INTO UTILIZZA
     (ID_Attivita_Programmata, ID_Vasca, Numero_Corsia)
@@ -190,12 +162,28 @@ WHERE a.ID_Utente = @utente_query;
 -- OP5 - REGISTRAZIONE DI UN ACCESSO AL NUOTO LIBERO
 -- ===========================================================================
 
-SET @tipo_dieci_ingressi = (
-    SELECT ID_Tipo_Abbonamento
-    FROM TIPO_ABBONAMENTO
-    WHERE Nome = 'Dieci ingressi'
-    LIMIT 1
-);
+INSERT INTO TIPO_ATTIVITA (Nome, Modalita_Partecipazione, Richiede_Istruttore)
+VALUES ('Nuoto libero temporaneo query', 'ACCESSO_LIBERO', FALSE);
+SET @tipo_libero_query = LAST_INSERT_ID();
+INSERT INTO TIPO_ABBONAMENTO
+    (Nome, Costo, Attivo, Modalita_Validita, Numero_Ingressi, Condizioni_Utilizzo)
+VALUES ('Dieci ingressi temporanei query', 10, FALSE, 'INGRESSI', 10,
+        'Accessi alla fascia dimostrativa');
+SET @tipo_dieci_ingressi = LAST_INSERT_ID();
+INSERT INTO COMPATIBILITA (ID_Tipo_Abbonamento, ID_Tipo_Attivita)
+VALUES (@tipo_dieci_ingressi, @tipo_libero_query);
+UPDATE TIPO_ABBONAMENTO SET Attivo = TRUE
+WHERE ID_Tipo_Abbonamento = @tipo_dieci_ingressi;
+INSERT INTO ATTIVITA_PROGRAMMATA
+    (ID_Tipo_Attivita, Titolo, Giorno_Settimanale, Ora_Inizio, Ora_Fine,
+     Capienza_Massima, Periodo_Inizio, Periodo_Fine, Stato)
+VALUES (@tipo_libero_query, 'Fascia temporanea query', @giorno_query,
+        '00:00:00', '23:59:59', 10, CURRENT_DATE, CURRENT_DATE, 'PROGRAMMATA');
+SET @nuoto_libero_demo = LAST_INSERT_ID();
+INSERT INTO UTILIZZA (ID_Attivita_Programmata, ID_Vasca, Numero_Corsia)
+VALUES (@nuoto_libero_demo, @vasca_principale, 2);
+UPDATE ATTIVITA_PROGRAMMATA SET Stato = 'ATTIVA'
+WHERE ID_Attivita_Programmata = @nuoto_libero_demo;
 
 INSERT INTO ABBONAMENTO
     (ID_Utente, ID_Tipo_Abbonamento, Data_Acquisto, Data_Inizio)
@@ -235,6 +223,20 @@ INSERT INTO INCARICO_SQUADRA
     (ID_Utente_Istruttore, ID_Squadra, Data_Inizio)
 VALUES (@utente_query, @squadra_query, CURRENT_DATE);
 
+INSERT INTO TIPO_ATTIVITA (Nome, Modalita_Partecipazione, Richiede_Istruttore)
+VALUES ('Allenamento temporaneo query', 'SQUADRA', TRUE);
+SET @tipo_squadra_query = LAST_INSERT_ID();
+INSERT INTO ATTIVITA_PROGRAMMATA
+    (ID_Tipo_Attivita, Titolo, Giorno_Settimanale, Ora_Inizio, Ora_Fine,
+     Capienza_Massima, Periodo_Inizio, Periodo_Fine, Stato)
+VALUES (@tipo_squadra_query, 'Allenamento temporaneo query', @giorno_query,
+        '09:00:00', '10:00:00', 10, CURRENT_DATE, CURRENT_DATE, 'PROGRAMMATA');
+SET @allenamento_demo = LAST_INSERT_ID();
+INSERT INTO UTILIZZA (ID_Attivita_Programmata, ID_Vasca, Numero_Corsia)
+VALUES (@allenamento_demo, @vasca_principale, 1);
+INSERT INTO ASSEGNATO_A (ID_Utente_Istruttore, ID_Attivita_Programmata)
+VALUES (@utente_query, @allenamento_demo);
+
 INSERT INTO SVOLGE
     (ID_Squadra, ID_Attivita_Programmata)
 VALUES (@squadra_query, @allenamento_demo);
@@ -264,18 +266,18 @@ SELECT *
 FROM VW_ATTIVITA_COMPLETE
 ORDER BY Titolo;
 
--- OP8: club e squadra con più atleti attualmente appartenenti.
+-- OP8: classifiche di club e squadre; tutti i pari merito sono visibili.
 SELECT *
 FROM VW_CLUB_ATLETI_ATTIVI
 ORDER BY Numero_Atleti DESC, Nome
-LIMIT 1;
+;
 
 SELECT *
 FROM VW_SQUADRA_ATLETI_ATTIVI
 ORDER BY Numero_Atleti DESC, Nome
-LIMIT 1;
+;
 
--- OP9: istruttore con più attività sovrapposte al periodo richiesto.
+-- OP9: classifica degli istruttori per attività sovrapposte al periodo richiesto.
 
 SELECT
     i.ID_Utente,
@@ -291,29 +293,30 @@ LEFT JOIN ATTIVITA_PROGRAMMATA ap
  AND ap.Periodo_Fine >= @dal
 GROUP BY i.ID_Utente, u.Cognome, u.Nome
 ORDER BY Numero_Attivita DESC
-LIMIT 1;
+;
 
 -- OP10: tipo di attività a iscrizione e tipo di abbonamento più frequenti.
-SELECT ta.ID_Tipo_Attivita, ta.Nome, COUNT(*) AS Numero_Iscrizioni
-FROM ISCRIZIONE_ATTIVITA i
-JOIN ATTIVITA_PROGRAMMATA ap
-  ON ap.ID_Attivita_Programmata = i.ID_Attivita_Programmata
-JOIN TIPO_ATTIVITA ta
-  ON ta.ID_Tipo_Attivita = ap.ID_Tipo_Attivita
-WHERE i.Data_Iscrizione BETWEEN @dal AND @al
-  AND ta.Modalita_Partecipazione = 'ISCRIZIONE'
+-- Come nella GUI: un unico risultato, inclusi i tipi con frequenza zero.
+SELECT 'ATTIVITA' AS Ambito, ta.Nome,
+       COUNT(i.ID_Iscrizione_Attivita) AS Frequenza
+FROM TIPO_ATTIVITA ta
+LEFT JOIN ATTIVITA_PROGRAMMATA ap
+  ON ap.ID_Tipo_Attivita = ta.ID_Tipo_Attivita
+LEFT JOIN ISCRIZIONE_ATTIVITA i
+  ON i.ID_Attivita_Programmata = ap.ID_Attivita_Programmata
+ AND i.Data_Iscrizione BETWEEN @dal AND @al
+WHERE ta.Modalita_Partecipazione = 'ISCRIZIONE'
 GROUP BY ta.ID_Tipo_Attivita, ta.Nome
-ORDER BY Numero_Iscrizioni DESC
-LIMIT 1;
-
-SELECT t.ID_Tipo_Abbonamento, t.Nome, COUNT(*) AS Numero_Acquisti
-FROM ABBONAMENTO a
-JOIN TIPO_ABBONAMENTO t
-  ON t.ID_Tipo_Abbonamento = a.ID_Tipo_Abbonamento
-WHERE a.Data_Acquisto BETWEEN @dal AND @al
+UNION ALL
+SELECT 'ABBONAMENTO' AS Ambito, t.Nome,
+       COUNT(a.ID_Abbonamento) AS Frequenza
+FROM TIPO_ABBONAMENTO t
+LEFT JOIN ABBONAMENTO a
+  ON a.ID_Tipo_Abbonamento = t.ID_Tipo_Abbonamento
+ AND a.Data_Acquisto BETWEEN @dal AND @al
 GROUP BY t.ID_Tipo_Abbonamento, t.Nome
-ORDER BY Numero_Acquisti DESC
-LIMIT 1;
+ORDER BY Ambito, Frequenza DESC, Nome
+;
 
 -- OP11: numero di abbonamenti attualmente utilizzabili.
 SELECT COUNT(*) AS Abbonamenti_Utilizzabili

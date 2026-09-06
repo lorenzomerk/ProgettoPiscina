@@ -1,6 +1,5 @@
 package it.unibo.piscina.view.gestione;
 
-import it.unibo.piscina.controller.GestioneController;
 import it.unibo.piscina.model.CampoEntita;
 import it.unibo.piscina.model.DefinizioneEntita;
 import it.unibo.piscina.model.OpzioneRiferimento;
@@ -38,7 +37,7 @@ final class EntitaFormDialog {
 
     static List<Object> show(
             final Component parent,
-            final GestioneController controller,
+            final Map<CampoEntita, List<OpzioneRiferimento>> references,
             final DefinizioneEntita definition,
             final List<Object> originalRow,
             final boolean editing) {
@@ -58,7 +57,7 @@ final class EntitaFormDialog {
                 ? originalRow.get(definition.campi().indexOf(field))
                 : defaultValue(field);
             final JComponent component = createComponent(
-                controller,
+                references,
                 field,
                 current
             );
@@ -100,7 +99,7 @@ final class EntitaFormDialog {
     }
 
     private static JComponent createComponent(
-            final GestioneController controller,
+            final Map<CampoEntita, List<OpzioneRiferimento>> references,
             final CampoEntita field,
             final Object value) {
 
@@ -121,7 +120,7 @@ final class EntitaFormDialog {
         }
         if (field.tipo() == TipoCampo.RIFERIMENTO) {
             final List<OpzioneRiferimento> options =
-                controller.caricaOpzioni(field.queryRiferimento());
+                references.getOrDefault(field, List.of());
             final JComboBox<OpzioneRiferimento> combo = new JComboBox<>(
                 options.toArray(OpzioneRiferimento[]::new)
             );
@@ -237,7 +236,7 @@ final class EntitaFormDialog {
 
     private static Object defaultValue(final CampoEntita field) {
         return switch (field.tipo()) {
-            case DATA -> LocalDate.now();
+            case DATA -> field.obbligatorio() ? LocalDate.now() : null;
             case DATA_ORA -> LocalDateTime.now().withNano(0);
             case BOOLEANO -> Boolean.FALSE;
             default -> null;

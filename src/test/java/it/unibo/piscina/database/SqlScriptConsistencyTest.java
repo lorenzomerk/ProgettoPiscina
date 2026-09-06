@@ -113,7 +113,7 @@ class SqlScriptConsistencyTest {
 
         final String demo = read("02_popolamento_demo.sql");
         final String projectReadme = Files.readString(
-            Path.of("README.md"),
+            Path.of("readme.txt"),
             StandardCharsets.UTF_8
         );
         final List<String> demoAccounts = List.of(
@@ -223,16 +223,27 @@ class SqlScriptConsistencyTest {
             throws IOException {
 
         final String readme = Files.readString(
-            Path.of("README.md"),
+            Path.of("readme.txt"),
             StandardCharsets.UTF_8
         );
 
-        assertTrue(readme.contains("Nuova installazione"));
-        assertTrue(readme.contains(
-            "Aggiornamento di un database della prima versione"
-        ));
-        assertTrue(readme.contains("doc/sql/01_schema_completo.sql"));
-        assertTrue(readme.contains("doc/sql/03_migrazione_database_esistente.sql"));
+        final int installazione = readme.indexOf("per un database nuovo");
+        final int migrazione = readme.indexOf("Per aggiornare un database");
+        assertTrue(installazione >= 0, "Istruzioni di nuova installazione mancanti");
+        assertTrue(migrazione > installazione, "Istruzioni di migrazione mancanti");
+
+        final String nuovaInstallazione = readme.substring(installazione, migrazione);
+        final int schema = nuovaInstallazione.indexOf("doc/sql/01_schema_completo.sql");
+        final int demo = nuovaInstallazione.indexOf("doc/sql/02_popolamento_demo.sql");
+        assertTrue(schema >= 0 && demo > schema,
+            "La nuova installazione deve indicare 01 prima di 02");
+
+        final String aggiornamento = readme.substring(migrazione);
+        final int aggiornamentoStruttura = aggiornamento.indexOf(
+            "doc/sql/03_migrazione_database_esistente.sql");
+        final int aggiornamentoSchema = aggiornamento.indexOf("doc/sql/01_schema_completo.sql");
+        assertTrue(aggiornamentoStruttura >= 0 && aggiornamentoSchema > aggiornamentoStruttura,
+            "La migrazione deve indicare 03 prima di 01");
     }
 
     private String read(final String fileName) throws IOException {

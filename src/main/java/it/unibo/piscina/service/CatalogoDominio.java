@@ -23,7 +23,6 @@ public final class CatalogoDominio {
         SELECT ID_Utente,
                CONCAT(Cognome, ' ', Nome, ' (#', ID_Utente, ')')
         FROM UTENTE
-        WHERE Attivo = TRUE
         ORDER BY Cognome, Nome
         """;
     private static final String LOOKUP_ATLETI = """
@@ -131,6 +130,9 @@ public final class CatalogoDominio {
             final String section,
             final SessioneUtente session) {
 
+        if (session == null || !session.puoAccedere(section)) {
+            return List.of();
+        }
         if ("La mia squadra".equals(section)) {
             return miaSquadra(session);
         }
@@ -662,15 +664,14 @@ public final class CatalogoDominio {
                 """,
                 List.of(
                     CampoEntita.id("ID", "ID_Appartenenza"),
-                    CampoEntita.riferimento(
+                    CampoEntita.chiave(
                         "Atleta", "ID_Utente_Atleta", LOOKUP_ATLETI
                     ),
-                    CampoEntita.riferimento(
+                    CampoEntita.chiave(
                         "Squadra", "ID_Squadra", LOOKUP_SQUADRE
                     ),
-                    CampoEntita.campo(
-                        "Data inizio", "Data_Inizio", DATA, true
-                    ),
+                    new CampoEntita("Data inizio", "Data_Inizio", DATA,
+                        true, true, false, List.of(), null),
                     CampoEntita.campo(
                         "Data fine", "Data_Fine", DATA, false
                     ),
@@ -699,16 +700,15 @@ public final class CatalogoDominio {
                 """,
                 List.of(
                     CampoEntita.id("ID", "ID_Incarico_Squadra"),
-                    CampoEntita.riferimento(
+                    CampoEntita.chiave(
                         "Istruttore", "ID_Utente_Istruttore",
                         LOOKUP_ISTRUTTORI
                     ),
-                    CampoEntita.riferimento(
+                    CampoEntita.chiave(
                         "Squadra", "ID_Squadra", LOOKUP_SQUADRE
                     ),
-                    CampoEntita.campo(
-                        "Data inizio", "Data_Inizio", DATA, true
-                    ),
+                    new CampoEntita("Data inizio", "Data_Inizio", DATA,
+                        true, true, false, List.of(), null),
                     CampoEntita.campo(
                         "Data fine", "Data_Fine", DATA, false
                     ),

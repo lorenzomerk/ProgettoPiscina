@@ -150,23 +150,27 @@ DEALLOCATE PREPARE drop_fk_account_utente;
 ALTER TABLE ACCOUNT
     ADD CONSTRAINT FK_ACCOUNT_UTENTE FOREIGN KEY (ID_Utente)
         REFERENCES UTENTE (ID_Utente)
-        ON UPDATE CASCADE
+        ON UPDATE RESTRICT
         ON DELETE RESTRICT;
 
-SET @add_fk_account_club = IF(
+SET @drop_fk_account_club = IF(
     EXISTS (
-        SELECT 1
-        FROM information_schema.REFERENTIAL_CONSTRAINTS
+        SELECT 1 FROM information_schema.REFERENTIAL_CONSTRAINTS
         WHERE CONSTRAINT_SCHEMA = DATABASE()
           AND TABLE_NAME = 'ACCOUNT'
           AND CONSTRAINT_NAME = 'FK_ACCOUNT_CLUB'
     ),
-    'SELECT 1',
-    'ALTER TABLE ACCOUNT ADD CONSTRAINT FK_ACCOUNT_CLUB FOREIGN KEY (ID_Club) REFERENCES CLUB_SPORTIVO (ID_Club) ON UPDATE CASCADE ON DELETE RESTRICT'
+    'ALTER TABLE ACCOUNT DROP FOREIGN KEY FK_ACCOUNT_CLUB',
+    'SELECT 1'
 );
-PREPARE add_fk_account_club FROM @add_fk_account_club;
-EXECUTE add_fk_account_club;
-DEALLOCATE PREPARE add_fk_account_club;
+PREPARE drop_fk_account_club FROM @drop_fk_account_club;
+EXECUTE drop_fk_account_club;
+DEALLOCATE PREPARE drop_fk_account_club;
+
+ALTER TABLE ACCOUNT
+    ADD CONSTRAINT FK_ACCOUNT_CLUB FOREIGN KEY (ID_Club)
+        REFERENCES CLUB_SPORTIVO (ID_Club)
+        ON UPDATE RESTRICT ON DELETE RESTRICT;
 
 -- Se esistono vecchi account UTENTE/CLUB privi di anagrafica, l'aggiunta del
 -- CHECK si arresta intenzionalmente: vanno collegati prima della migrazione.

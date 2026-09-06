@@ -6,6 +6,7 @@ import java.sql.Connection;
 import java.sql.DriverManager;
 import java.sql.SQLException;
 import java.util.Properties;
+import java.util.List;
 
 /** Funzioni comuni per l'accesso al database. */
 public final class DAOUtils {
@@ -71,23 +72,26 @@ public final class DAOUtils {
     public static void checkConnection(
             final ConnectionFactory connectionFactory) {
 
-        try (
-            Connection connection = connectionFactory.openConnection();
-            var statement =
-                connection.prepareStatement(
-                    "SELECT (SELECT COUNT(*) FROM UTENTE) >= 0 "
-                        + "AND (SELECT COUNT(*) FROM ACCOUNT) >= 0"
-                );
-            var resultSet = statement.executeQuery()
-        ) {
-            if (!resultSet.next() || resultSet.getInt(1) != 1) {
-                throw new DAOException(
-                    "Risposta inattesa dal database"
-                );
+        try (Connection connection = connectionFactory.openConnection();
+                var statement = connection.createStatement()) {
+            for (String table : List.of(
+                    "UTENTE", "ATLETA", "ISTRUTTORE", "ACCOUNT",
+                    "TIPO_ABBONAMENTO", "ABBONAMENTO", "TIPO_ATTIVITA",
+                    "ATTIVITA_PROGRAMMATA", "ISCRIZIONE_ATTIVITA",
+                    "ACCESSO_NUOTO_LIBERO", "COMPATIBILITA", "VASCA", "CORSIA",
+                    "UTILIZZA", "ASSEGNATO_A", "CLUB_SPORTIVO", "SQUADRA",
+                    "APPARTENENZA_SQUADRA", "INCARICO_SQUADRA", "SVOLGE",
+                    "VW_ATTIVITA_COMPLETE", "VW_ABBONAMENTI_UTILIZZABILI",
+                    "VW_CLUB_ATLETI_ATTIVI", "VW_SQUADRA_ATLETI_ATTIVI")) {
+                // Verifica esistenza, permessi e dipendenze senza scansionare i dati.
+                try (var result = statement.executeQuery(
+                        "SELECT * FROM " + table + " LIMIT 0")) {
+                    result.getMetaData();
+                }
             }
         } catch (SQLException exception) {
             throw new DAOException(
-                "Errore durante il controllo della connessione",
+                "Schema incompleto o non accessibile: " + exception.getMessage(),
                 exception
             );
         }

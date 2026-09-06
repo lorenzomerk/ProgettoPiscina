@@ -11,8 +11,8 @@
             "preLaunchTask": "Compila Gestione Piscina",
             "env": {
                 "PISCINA_DB_URL": "jdbc:mysql://127.0.0.1:3306/piscina_progetto?serverTimezone=Europe/Rome&characterEncoding=UTF-8",
-                "PISCINA_DB_USER": "piscina_app",
-                "PISCINA_DB_PASSWORD": "Piscina!"
+                "PISCINA_DB_USER": "root",
+                "PISCINA_DB_PASSWORD": ""
             },
             "classPaths": [
                 "${workspaceFolder}/bin",

@@ -18,7 +18,8 @@ public final class JdbcAccountDAO implements AccountDAO {
 
     private static final String FIND_BY_EMAIL = """
         SELECT A.ID_Account, A.ID_Utente, A.ID_Club,
-               A.Nome, A.Cognome, A.Email,
+               COALESCE(U.Nome, A.Nome) AS Nome,
+               COALESCE(U.Cognome, A.Cognome) AS Cognome, A.Email,
                A.Password_Hash, A.Password_Salt, A.Password_Iterazioni,
                A.Ruolo,
                A.Attivo,
@@ -33,6 +34,7 @@ public final class JdbcAccountDAO implements AccountDAO {
                    WHERE I.ID_Utente = A.ID_Utente
                ) AS Qualifica_Istruttore
         FROM ACCOUNT A
+        LEFT JOIN UTENTE U ON U.ID_Utente = A.ID_Utente
         WHERE A.Email = ?
         """;
 

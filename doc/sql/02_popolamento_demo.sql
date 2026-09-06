@@ -157,8 +157,8 @@ FROM CLUB_SPORTIVO
 WHERE Nome = 'Nuoto Emilia'
 ON DUPLICATE KEY UPDATE Categoria = VALUES(Categoria);
 
-INSERT INTO APPARTENENZA_SQUADRA
-    (ID_Utente_Atleta, ID_Squadra, Data_Inizio, Data_Fine)
+CREATE TEMPORARY TABLE _righe_demo LIKE APPARTENENZA_SQUADRA;
+INSERT INTO _righe_demo (ID_Utente_Atleta, ID_Squadra, Data_Inizio, Data_Fine)
 SELECT u.ID_Utente, s.ID_Squadra,
        DATE_SUB(CURRENT_DATE, INTERVAL 180 DAY), NULL
 FROM UTENTE u
@@ -170,9 +170,12 @@ WHERE u.Email = 'atleta@piscina.local'
       WHERE a.ID_Utente_Atleta = u.ID_Utente
         AND a.Data_Fine IS NULL
   );
+INSERT INTO APPARTENENZA_SQUADRA (ID_Utente_Atleta, ID_Squadra, Data_Inizio, Data_Fine)
+SELECT ID_Utente_Atleta, ID_Squadra, Data_Inizio, Data_Fine FROM _righe_demo;
+DROP TEMPORARY TABLE _righe_demo;
 
-INSERT INTO INCARICO_SQUADRA
-    (ID_Utente_Istruttore, ID_Squadra, Data_Inizio, Data_Fine)
+CREATE TEMPORARY TABLE _righe_demo LIKE INCARICO_SQUADRA;
+INSERT INTO _righe_demo (ID_Utente_Istruttore, ID_Squadra, Data_Inizio, Data_Fine)
 SELECT u.ID_Utente, s.ID_Squadra,
        DATE_SUB(CURRENT_DATE, INTERVAL 180 DAY), NULL
 FROM UTENTE u
@@ -185,6 +188,9 @@ WHERE u.Email = 'atleta.istruttore@piscina.local'
         AND i.ID_Squadra = s.ID_Squadra
         AND i.Data_Fine IS NULL
   );
+INSERT INTO INCARICO_SQUADRA (ID_Utente_Istruttore, ID_Squadra, Data_Inizio, Data_Fine)
+SELECT ID_Utente_Istruttore, ID_Squadra, Data_Inizio, Data_Fine FROM _righe_demo;
+DROP TEMPORARY TABLE _righe_demo;
 
 SET @giorno_corrente = ELT(
     WEEKDAY(CURRENT_DATE) + 1,
@@ -237,8 +243,8 @@ WHERE Nome = 'Allenamento sportivo'
       WHERE Titolo = 'Allenamento squadra demo'
   );
 
-INSERT INTO UTILIZZA
-    (ID_Attivita_Programmata, ID_Vasca, Numero_Corsia)
+CREATE TEMPORARY TABLE _righe_demo LIKE UTILIZZA;
+INSERT INTO _righe_demo (ID_Attivita_Programmata, ID_Vasca, Numero_Corsia)
 SELECT ap.ID_Attivita_Programmata, v.ID_Vasca,
        CASE ap.Titolo
            WHEN 'Corso adulti demo' THEN 1
@@ -264,9 +270,12 @@ WHERE ap.Titolo IN (
             ELSE 3
         END
   );
+INSERT INTO UTILIZZA (ID_Attivita_Programmata, ID_Vasca, Numero_Corsia)
+SELECT ID_Attivita_Programmata, ID_Vasca, Numero_Corsia FROM _righe_demo;
+DROP TEMPORARY TABLE _righe_demo;
 
-INSERT INTO ASSEGNATO_A
-    (ID_Utente_Istruttore, ID_Attivita_Programmata)
+CREATE TEMPORARY TABLE _righe_demo LIKE ASSEGNATO_A;
+INSERT INTO _righe_demo (ID_Utente_Istruttore, ID_Attivita_Programmata)
 SELECT u.ID_Utente, ap.ID_Attivita_Programmata
 FROM UTENTE u
 JOIN ATTIVITA_PROGRAMMATA ap
@@ -282,6 +291,9 @@ WHERE u.Email = 'atleta.istruttore@piscina.local'
         AND x.ID_Attivita_Programmata =
             ap.ID_Attivita_Programmata
   );
+INSERT INTO ASSEGNATO_A (ID_Utente_Istruttore, ID_Attivita_Programmata)
+SELECT ID_Utente_Istruttore, ID_Attivita_Programmata FROM _righe_demo;
+DROP TEMPORARY TABLE _righe_demo;
 
 INSERT INTO SVOLGE
     (ID_Squadra, ID_Attivita_Programmata)
@@ -340,8 +352,9 @@ WHERE u.Email = 'cliente@piscina.local'
         AND a.ID_Tipo_Abbonamento = t.ID_Tipo_Abbonamento
   );
 
-INSERT INTO ISCRIZIONE_ATTIVITA
-    (ID_Abbonamento, ID_Attivita_Programmata, Data_Iscrizione)
+-- Separa la selezione dai trigger che bloccano le righe di dominio.
+CREATE TEMPORARY TABLE _righe_demo LIKE ISCRIZIONE_ATTIVITA;
+INSERT INTO _righe_demo (ID_Abbonamento, ID_Attivita_Programmata, Data_Iscrizione)
 SELECT a.ID_Abbonamento, ap.ID_Attivita_Programmata, CURRENT_DATE
 FROM ABBONAMENTO a
 JOIN TIPO_ABBONAMENTO t
@@ -357,6 +370,9 @@ WHERE u.Email = 'cliente@piscina.local'
         AND i.ID_Attivita_Programmata =
             ap.ID_Attivita_Programmata
   );
+INSERT INTO ISCRIZIONE_ATTIVITA (ID_Abbonamento, ID_Attivita_Programmata, Data_Iscrizione)
+SELECT ID_Abbonamento, ID_Attivita_Programmata, Data_Iscrizione FROM _righe_demo;
+DROP TEMPORARY TABLE _righe_demo;
 
 -- L'accesso demo deve essere creato una sola volta e deve rispettare la
 -- pianificazione anche quando il popolamento viene rieseguito in un giorno
@@ -438,8 +454,8 @@ FROM VASCA
 WHERE Nome = 'Vasca principale';
 
 -- 3. Assegnazione della nuova corsia all'attività
-INSERT INTO UTILIZZA
-    (ID_Attivita_Programmata, ID_Vasca, Numero_Corsia)
+CREATE TEMPORARY TABLE _righe_demo LIKE UTILIZZA;
+INSERT INTO _righe_demo (ID_Attivita_Programmata, ID_Vasca, Numero_Corsia)
 SELECT ap.ID_Attivita_Programmata, v.ID_Vasca, 4
 FROM ATTIVITA_PROGRAMMATA ap
 JOIN VASCA v ON v.Nome = 'Vasca principale'
@@ -452,10 +468,13 @@ WHERE ap.Titolo = 'Corso esclusivo al completo'
         AND x.ID_Vasca = v.ID_Vasca
         AND x.Numero_Corsia = 4
   );
+INSERT INTO UTILIZZA (ID_Attivita_Programmata, ID_Vasca, Numero_Corsia)
+SELECT ID_Attivita_Programmata, ID_Vasca, Numero_Corsia FROM _righe_demo;
+DROP TEMPORARY TABLE _righe_demo;
 
 -- 4. Assegnazione istruttore
-INSERT INTO ASSEGNATO_A
-    (ID_Utente_Istruttore, ID_Attivita_Programmata)
+CREATE TEMPORARY TABLE _righe_demo LIKE ASSEGNATO_A;
+INSERT INTO _righe_demo (ID_Utente_Istruttore, ID_Attivita_Programmata)
 SELECT u.ID_Utente, ap.ID_Attivita_Programmata
 FROM UTENTE u
 JOIN ATTIVITA_PROGRAMMATA ap
@@ -468,6 +487,9 @@ WHERE u.Email = 'istruttore@piscina.local'
         AND x.ID_Attivita_Programmata =
             ap.ID_Attivita_Programmata
   );
+INSERT INTO ASSEGNATO_A (ID_Utente_Istruttore, ID_Attivita_Programmata)
+SELECT ID_Utente_Istruttore, ID_Attivita_Programmata FROM _righe_demo;
+DROP TEMPORARY TABLE _righe_demo;
 
 -- 5. Attivazione dell'attività
 UPDATE ATTIVITA_PROGRAMMATA
@@ -475,8 +497,9 @@ SET Stato = 'ATTIVA'
 WHERE Titolo = 'Corso esclusivo al completo';
 
 -- 6. Iscrizione dell'utente cliente
-INSERT INTO ISCRIZIONE_ATTIVITA
-    (ID_Abbonamento, ID_Attivita_Programmata, Data_Iscrizione)
+-- Separa la selezione dai trigger che bloccano le righe di dominio.
+CREATE TEMPORARY TABLE _righe_demo LIKE ISCRIZIONE_ATTIVITA;
+INSERT INTO _righe_demo (ID_Abbonamento, ID_Attivita_Programmata, Data_Iscrizione)
 SELECT a.ID_Abbonamento, ap.ID_Attivita_Programmata, CURRENT_DATE
 FROM ABBONAMENTO a
 JOIN TIPO_ABBONAMENTO t
@@ -491,6 +514,9 @@ WHERE u.Email = 'cliente@piscina.local'
       WHERE i.ID_Abbonamento = a.ID_Abbonamento
         AND i.ID_Attivita_Programmata = ap.ID_Attivita_Programmata
   );
+INSERT INTO ISCRIZIONE_ATTIVITA (ID_Abbonamento, ID_Attivita_Programmata, Data_Iscrizione)
+SELECT ID_Abbonamento, ID_Attivita_Programmata, Data_Iscrizione FROM _righe_demo;
+DROP TEMPORARY TABLE _righe_demo;
 
 -- ESPANSIONE DATI DEMO: CASI LIMITE, STORICO E NUOVI CLUB
 
@@ -684,7 +710,8 @@ ON DUPLICATE KEY UPDATE Qualifica = VALUES(Qualifica);
 
 -- 3. Appartenenza alle Squadre (Atleti)
 -- Inseriamo Marco e Sofia nella nuova squadra "Esordienti A" dei Delfini Blu
-INSERT INTO APPARTENENZA_SQUADRA (ID_Utente_Atleta, ID_Squadra, Data_Inizio, Data_Fine)
+CREATE TEMPORARY TABLE _righe_demo LIKE APPARTENENZA_SQUADRA;
+INSERT INTO _righe_demo (ID_Utente_Atleta, ID_Squadra, Data_Inizio, Data_Fine)
 SELECT u.ID_Utente, s.ID_Squadra, DATE_SUB(CURRENT_DATE, INTERVAL 60 DAY), NULL
 FROM UTENTE u CROSS JOIN SQUADRA s
 WHERE u.Email IN ('junior1@piscina.local', 'junior2@piscina.local') AND s.Nome = 'Esordienti A'
@@ -692,9 +719,13 @@ WHERE u.Email IN ('junior1@piscina.local', 'junior2@piscina.local') AND s.Nome =
       SELECT 1 FROM APPARTENENZA_SQUADRA a 
       WHERE a.ID_Utente_Atleta = u.ID_Utente AND a.Data_Fine IS NULL
   );
+INSERT INTO APPARTENENZA_SQUADRA (ID_Utente_Atleta, ID_Squadra, Data_Inizio, Data_Fine)
+SELECT ID_Utente_Atleta, ID_Squadra, Data_Inizio, Data_Fine FROM _righe_demo;
+DROP TEMPORARY TABLE _righe_demo;
 
 -- Inseriamo Luca nella squadra "Agonistica Senior" per fare compagnia ad Alice e Andrea
-INSERT INTO APPARTENENZA_SQUADRA (ID_Utente_Atleta, ID_Squadra, Data_Inizio, Data_Fine)
+CREATE TEMPORARY TABLE _righe_demo LIKE APPARTENENZA_SQUADRA;
+INSERT INTO _righe_demo (ID_Utente_Atleta, ID_Squadra, Data_Inizio, Data_Fine)
 SELECT u.ID_Utente, s.ID_Squadra, DATE_SUB(CURRENT_DATE, INTERVAL 90 DAY), NULL
 FROM UTENTE u CROSS JOIN SQUADRA s
 WHERE u.Email = 'senior2@piscina.local' AND s.Nome = 'Agonistica Senior'
@@ -702,10 +733,14 @@ WHERE u.Email = 'senior2@piscina.local' AND s.Nome = 'Agonistica Senior'
       SELECT 1 FROM APPARTENENZA_SQUADRA a 
       WHERE a.ID_Utente_Atleta = u.ID_Utente AND a.Data_Fine IS NULL
   );
+INSERT INTO APPARTENENZA_SQUADRA (ID_Utente_Atleta, ID_Squadra, Data_Inizio, Data_Fine)
+SELECT ID_Utente_Atleta, ID_Squadra, Data_Inizio, Data_Fine FROM _righe_demo;
+DROP TEMPORARY TABLE _righe_demo;
 
 -- 4. Incarichi per le Squadre (Istruttori)
 -- Assegniamo la nuova istruttrice Giulia alla guida degli Esordienti A
-INSERT INTO INCARICO_SQUADRA (ID_Utente_Istruttore, ID_Squadra, Data_Inizio, Data_Fine)
+CREATE TEMPORARY TABLE _righe_demo LIKE INCARICO_SQUADRA;
+INSERT INTO _righe_demo (ID_Utente_Istruttore, ID_Squadra, Data_Inizio, Data_Fine)
 SELECT u.ID_Utente, s.ID_Squadra, DATE_SUB(CURRENT_DATE, INTERVAL 60 DAY), NULL
 FROM UTENTE u CROSS JOIN SQUADRA s
 WHERE u.Email = 'coach@piscina.local' AND s.Nome = 'Esordienti A'
@@ -713,9 +748,13 @@ WHERE u.Email = 'coach@piscina.local' AND s.Nome = 'Esordienti A'
       SELECT 1 FROM INCARICO_SQUADRA i 
       WHERE i.ID_Utente_Istruttore = u.ID_Utente AND i.ID_Squadra = s.ID_Squadra AND i.Data_Fine IS NULL
   );
+INSERT INTO INCARICO_SQUADRA (ID_Utente_Istruttore, ID_Squadra, Data_Inizio, Data_Fine)
+SELECT ID_Utente_Istruttore, ID_Squadra, Data_Inizio, Data_Fine FROM _righe_demo;
+DROP TEMPORARY TABLE _righe_demo;
 
 -- Assegniamo l'istruttore esistente (Ivo) come supporto alla Agonistica Senior
-INSERT INTO INCARICO_SQUADRA (ID_Utente_Istruttore, ID_Squadra, Data_Inizio, Data_Fine)
+CREATE TEMPORARY TABLE _righe_demo LIKE INCARICO_SQUADRA;
+INSERT INTO _righe_demo (ID_Utente_Istruttore, ID_Squadra, Data_Inizio, Data_Fine)
 SELECT u.ID_Utente, s.ID_Squadra, DATE_SUB(CURRENT_DATE, INTERVAL 120 DAY), NULL
 FROM UTENTE u CROSS JOIN SQUADRA s
 WHERE u.Email = 'istruttore@piscina.local' AND s.Nome = 'Agonistica Senior'
@@ -723,6 +762,9 @@ WHERE u.Email = 'istruttore@piscina.local' AND s.Nome = 'Agonistica Senior'
       SELECT 1 FROM INCARICO_SQUADRA i 
       WHERE i.ID_Utente_Istruttore = u.ID_Utente AND i.ID_Squadra = s.ID_Squadra AND i.Data_Fine IS NULL
   );
+INSERT INTO INCARICO_SQUADRA (ID_Utente_Istruttore, ID_Squadra, Data_Inizio, Data_Fine)
+SELECT ID_Utente_Istruttore, ID_Squadra, Data_Inizio, Data_Fine FROM _righe_demo;
+DROP TEMPORARY TABLE _righe_demo;
 
 -- ===========================================================================
 -- ACCOUNT TECNICI DELL'INTERFACCIA

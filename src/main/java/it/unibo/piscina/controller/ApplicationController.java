@@ -1,10 +1,11 @@
 package it.unibo.piscina.controller;
 
 import it.unibo.piscina.data.ConnectionFactory;
-import it.unibo.piscina.data.DAOException;
 import it.unibo.piscina.data.DAOUtils;
 import it.unibo.piscina.model.SessioneUtente;
 import it.unibo.piscina.view.ApplicationView;
+import javax.swing.SwingWorker;
+import java.util.concurrent.ExecutionException;
 
 /** Coordina il modello e la vista. */
 public final class ApplicationController {
@@ -22,19 +23,30 @@ public final class ApplicationController {
     }
 
     public void start() {
-        try {
-            DAOUtils.checkConnection(connectionFactory);
-            view.setDatabaseConnected(true);
-            view.showLogin();
-        } catch (DAOException exception) {
-            view.setDatabaseConnected(false);
-            view.showLogin();
-            view.showMessage(
-                "Database non disponibile: " + exception.getMessage()
-                    + "\nEsegui doc/sql/01_schema_completo.sql e controlla la "
-                    + "configurazione."
-            );
-        }
+        view.showLogin();
+        new SwingWorker<Void, Void>() {
+            @Override
+            protected Void doInBackground() {
+                DAOUtils.checkConnection(connectionFactory);
+                return null;
+            }
+
+            @Override
+            protected void done() {
+                try {
+                    get();
+                    view.setDatabaseConnected(true);
+                } catch (InterruptedException exception) {
+                    Thread.currentThread().interrupt();
+                    view.setDatabaseConnected(false);
+                } catch (ExecutionException exception) {
+                    view.setDatabaseConnected(false);
+                    view.showMessage("Database non disponibile: "
+                        + exception.getCause().getMessage()
+                        + "\nEsegui doc/sql/01_schema_completo.sql e controlla la configurazione.");
+                }
+            }
+        }.execute();
     }
 
     public void userAuthenticated(final SessioneUtente session) {

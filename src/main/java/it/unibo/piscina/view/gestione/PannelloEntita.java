@@ -7,6 +7,9 @@ import static it.unibo.piscina.view.theme.PoolTheme.SURFACE;
 import static it.unibo.piscina.view.theme.PoolTheme.TEXT;
 
 import it.unibo.piscina.controller.GestioneController;
+import it.unibo.piscina.model.CampoEntita;
+import it.unibo.piscina.model.OpzioneRiferimento;
+import it.unibo.piscina.model.TipoCampo;
 import it.unibo.piscina.model.DatiTabella;
 import it.unibo.piscina.model.DefinizioneEntita;
 import it.unibo.piscina.view.theme.PoolTheme;
@@ -15,6 +18,8 @@ import java.awt.Color;
 import java.awt.FlowLayout;
 import java.awt.Font;
 import java.util.List;
+import java.util.Map;
+import java.util.LinkedHashMap;
 import java.util.Objects;
 import java.util.concurrent.ExecutionException;
 import javax.swing.BorderFactory;
@@ -160,26 +165,13 @@ final class PannelloEntita extends JPanel {
     }
 
     private void configureActions() {
-        addButton.addActionListener(event -> {
-            final List<Object> values = EntitaFormDialog.show(
-                this, controller, definition, null, false
-            );
-            if (values != null) {
-                runMutation(() -> controller.inserisci(definition, values));
-            }
-        });
+        addButton.addActionListener(event -> openForm(null, false));
         editButton.addActionListener(event -> {
             final List<Object> selected = selectedRow();
             if (selected == null) {
                 return;
             }
-            final List<Object> values = EntitaFormDialog.show(
-                this, controller, definition, selected, true
-            );
-            if (values != null) {
-                runMutation(() ->
-                    controller.modifica(definition, selected, values));
-            }
+            openForm(selected, true);
         });
         deleteButton.addActionListener(event -> deleteSelected());
         reloadButton.addActionListener(event -> reloadData());
@@ -192,6 +184,52 @@ final class PannelloEntita extends JPanel {
                 }
             }
         });
+    }
+
+    private void openForm(final List<Object> selected, final boolean editing) {
+        setBusy(true, "Caricamento dei valori disponibili...");
+        new SwingWorker<Map<CampoEntita, List<OpzioneRiferimento>>, Void>() {
+            @Override
+            protected Map<CampoEntita, List<OpzioneRiferimento>> doInBackground() {
+                final Map<CampoEntita, List<OpzioneRiferimento>> references =
+                    new LinkedHashMap<>();
+                for (CampoEntita field : definition.campi()) {
+                    if (!field.generato() && (!editing || !field.chiave())
+                            && field.tipo() == TipoCampo.RIFERIMENTO) {
+                        references.put(field,
+                            controller.caricaOpzioni(field.queryRiferimento()));
+                    }
+                }
+                return references;
+            }
+
+            @Override
+            protected void done() {
+                try {
+                    final var references = get();
+                    setBusy(false, rows.size() + " record");
+                    final List<Object> values = EntitaFormDialog.show(
+                        PannelloEntita.this, references, definition, selected, editing
+                    );
+                    if (values != null) {
+                        runMutation(() -> {
+                            if (editing) {
+                                controller.modifica(definition, selected, values);
+                            } else {
+                                controller.inserisci(definition, values);
+                            }
+                        });
+                    }
+                } catch (InterruptedException exception) {
+                    Thread.currentThread().interrupt();
+                    setBusy(false, "Caricamento interrotto");
+                    showError("Caricamento interrotto");
+                } catch (ExecutionException exception) {
+                    setBusy(false, "Valori non disponibili");
+                    showError(message(exception.getCause()));
+                }
+            }
+        }.execute();
     }
 
     private void deleteSelected() {
